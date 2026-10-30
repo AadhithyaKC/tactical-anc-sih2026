@@ -12,6 +12,7 @@ A real-time, low-latency neural active noise cancellation (ANC) and speech enhan
 ## Table of Contents
 
 - [Overview](#overview)
+- [Demonstration](#Demonstration)
 - [Key Features](#key-features)
 - [Architecture & Mechanics](#architecture--mechanics)
 - [System Requirements](#system-requirements)
@@ -38,6 +39,14 @@ High-noise environments (tactical gear, combat vehicles, industrial machinery, a
 **Tactical AI-ANC** leverages deep filtering algorithms to isolate speech formants and suppress non-stationary acoustic noise in sub-10ms frame budgets. It incorporates a zero-allocation ring buffer, continuous dual-stream recording (raw vs. enhanced), and spectral diagnostic tools.
 
 ---
+
+## Demonstration
+
+Watch the real-time AI noise cancellation demo on heavy traffic noise and offline spectrogram analysis:
+
+[![SIH 26052 Demo](https://img.youtube.com/vi/hNaJMNzLXLs/maxresdefault.jpg)](https://www.youtube.com/watch?v=hNaJMNzLXLs)
+
+> *Click the image above to watch the demonstration on YouTube.*
 
 ## Key Features
 
