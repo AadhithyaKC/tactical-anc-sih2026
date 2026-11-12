@@ -1149,6 +1149,86 @@
     `;
 
     // =========================================================================
+    // 1B. BACKGROUND WEB WORKER FOR MODE 2 BATCH INFERENCE
+    // (Bypasses Chromium's 8 MB main-thread sync WASM compilation limit)
+    // =========================================================================
+    const batchWorkerSource = `
+      let dfMod = null;
+
+      self.onmessage = (e) => {
+        const d = e.data;
+        if (d.type === 'RUN_BATCH') {
+          try {
+            if (!dfMod) {
+              const createBindings = new Function(d.dfJsCode + '\\nreturn wasm_bindgen;');
+              dfMod = createBindings();
+              dfMod.initSync(new Uint8Array(d.wasmBytes));
+            }
+
+            const statePtr = dfMod.df_create(new Uint8Array(d.modelBytes), 28.0);
+            if (!statePtr) {
+              throw new Error('Failed to initialize DeepFilterNet3 batch state.');
+            }
+
+            const hopSize = dfMod.df_get_frame_length(statePtr) || 480;
+            const lookaheadFrames = 2;
+            const rawSamples = d.rawSamples;
+            const totalSamples = rawSamples.length;
+            const numFrames = Math.ceil(totalSamples / hopSize);
+            const totalPassFrames = numFrames + lookaheadFrames;
+
+            const inHop = new Float32Array(hopSize);
+            const outHop = new Float32Array(hopSize);
+            const alignedClean = new Float32Array(totalSamples);
+            const outGain = d.outGain;
+
+            const t0 = performance.now();
+
+            for (let f = 0; f < totalPassFrames; f++) {
+              inHop.fill(0);
+              if (f < numFrames) {
+                const srcStart = f * hopSize;
+                const copyLen = Math.min(hopSize, totalSamples - srcStart);
+                inHop.set(rawSamples.subarray(srcStart, srcStart + copyLen), 0);
+              }
+
+              dfMod.df_process_frame(statePtr, inHop, outHop);
+
+              const outFrameIdx = f - lookaheadFrames;
+              if (outFrameIdx >= 0) {
+                const dstStart = outFrameIdx * hopSize;
+                const writeLen = Math.min(hopSize, totalSamples - dstStart);
+                for (let i = 0; i < writeLen; i++) {
+                  let s = Math.tanh(outHop[i] * outGain);
+                  if (s > 0.98) s = 0.98;
+                  if (s < -0.98) s = -0.98;
+                  alignedClean[dstStart + i] = s;
+                }
+              }
+
+              if (f % 35 === 0) {
+                const pct = Math.min(98, Math.round((f / totalPassFrames) * 100));
+                self.postMessage({ type: 'PROGRESS', pct });
+              }
+            }
+
+            if (typeof dfMod.df_free === 'function') {
+              try { dfMod.df_free(statePtr); } catch (_) {}
+            }
+
+            const elapsedMs = performance.now() - t0;
+            self.postMessage(
+              { type: 'DONE', rawSamples, cleanSamples: alignedClean, elapsedMs },
+              [rawSamples.buffer, alignedClean.buffer]
+            );
+          } catch (err) {
+            self.postMessage({ type: 'ERROR', message: err.message || String(err) });
+          }
+        }
+      };
+    `;
+
+    // =========================================================================
     // 2. APPLICATION STATE & SHARED RESOURCES
     // =========================================================================
     const SAMPLE_RATE = 48000;
@@ -1162,7 +1242,7 @@
     let liveCleanChunks = [];
 
     let cachedAssets = null;
-    let mainThreadDfMod = null;
+    let batchWorker = null;
 
     // Live Stream State
     let audioCtx = null;
@@ -1192,7 +1272,7 @@
     let batchPlaybackStartTime = 0;
     let batchPlaybackDuration = 0;
     let batchPlayheadAnimId = null;
-    let activeBatchPlaybackType = null; // 'raw' | 'clean' | null
+    let activeBatchPlaybackType = null;
 
     // DOM Elements
     const modeLiveTab = document.getElementById('modeLiveTab');
@@ -1307,14 +1387,13 @@
       return cachedAssets;
     }
 
-    async function getMainThreadDfModule() {
-      if (mainThreadDfMod) return mainThreadDfMod;
-      const assets = await loadEngineAssets();
-      const createBindings = new Function(assets.dfJsCode + '\nreturn wasm_bindgen;');
-      const mod = createBindings();
-      mod.initSync(new Uint8Array(assets.wasmBytes.slice(0)));
-      mainThreadDfMod = mod;
-      return mod;
+    function getBatchWorker() {
+      if (batchWorker) return batchWorker;
+      const blob = new Blob([batchWorkerSource], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
+      batchWorker = new Worker(url);
+      URL.revokeObjectURL(url);
+      return batchWorker;
     }
 
     // =========================================================================
@@ -1877,7 +1956,6 @@
       return lut;
     })();
 
-    // Fast Radix-2 FFT (N = 1024) for STFT Spectrograms
     const FFT_N = 1024;
     const HANN_WIN = new Float32Array(FFT_N);
     const FFT_COS = new Float32Array(FFT_N / 2);
@@ -1903,7 +1981,7 @@
       const c = targetCanvas.getContext('2d');
       const W = targetCanvas.width;
       const H = targetCanvas.height;
-      const hop = 512; // 50% overlap (matches noverlap=512 in stream_windows.py)
+      const hop = 512;
       const numFrames = Math.max(1, Math.floor((samples.length - FFT_N) / hop) + 1);
       const halfBins = FFT_N >> 1;
 
@@ -1972,7 +2050,6 @@
       }
       c.putImageData(img, 0, 0);
 
-      // Subtle frequency & time grid overlay
       c.strokeStyle = 'rgba(255, 255, 255, 0.12)';
       c.lineWidth = 1;
       for (let g = 1; g <= 3; g++) {
@@ -2057,7 +2134,6 @@
     }
 
     function computeNoiseFloorDropDb(rawSamples, cleanSamples) {
-      // Compare 15th-percentile frame RMS (background noise floor) before vs after
       const frameLen = 480;
       const nFrames = Math.floor(rawSamples.length / frameLen);
       if (nFrames < 5) return 0;
@@ -2099,70 +2175,50 @@
       streamDot.className = 'dot loading';
       engineStatus.textContent = 'Batch Processing...';
       batchMeterLabel.textContent = 'DeepFilterNet3 Offline STFT Pass';
-      batchProgressText.textContent = 'Loading WASM...';
+      batchProgressText.textContent = 'Loading Worker...';
       batchProgressBar.style.width = '5%';
 
       try {
         const assets = await loadEngineAssets();
-        const dfMod = await getMainThreadDfModule();
-
-        // Instantiate fresh DF state so live stream state is untouched (mirrors stream_windows.py)
-        const statePtr = dfMod.df_create(new Uint8Array(assets.modelBytes.slice(0)), 28.0);
-        if (!statePtr) throw new Error('Failed to initialize DeepFilterNet3 batch state.');
-
-        const hopSize = dfMod.df_get_frame_length(statePtr) || 480;
-        const lookaheadFrames = 2; // Compensate 2-frame STFT/ERB lookahead delay
-        const totalSamples = rawSamples.length;
-        const numFrames = Math.ceil(totalSamples / hopSize);
-        const totalPassFrames = numFrames + lookaheadFrames;
-
-        const inHop = new Float32Array(hopSize);
-        const outHop = new Float32Array(hopSize);
-        const alignedClean = new Float32Array(totalSamples);
+        const worker = getBatchWorker();
         const outGain = parseFloat(batchGainSlider.value);
 
-        const t0 = performance.now();
-
-        for (let f = 0; f < totalPassFrames; f++) {
-          inHop.fill(0);
-          if (f < numFrames) {
-            const srcStart = f * hopSize;
-            const copyLen = Math.min(hopSize, totalSamples - srcStart);
-            inHop.set(rawSamples.subarray(srcStart, srcStart + copyLen), 0);
-          }
-
-          dfMod.df_process_frame(statePtr, inHop, outHop);
-
-          const outFrameIdx = f - lookaheadFrames;
-          if (outFrameIdx >= 0) {
-            const dstStart = outFrameIdx * hopSize;
-            const writeLen = Math.min(hopSize, totalSamples - dstStart);
-            for (let i = 0; i < writeLen; i++) {
-              let s = Math.tanh(outHop[i] * outGain);
-              if (s > 0.98) s = 0.98;
-              if (s < -0.98) s = -0.98;
-              alignedClean[dstStart + i] = s;
+        const result = await new Promise((resolve, reject) => {
+          worker.onmessage = (ev) => {
+            const msg = ev.data;
+            if (msg.type === 'PROGRESS') {
+              batchProgressBar.style.width = msg.pct + '%';
+              batchProgressText.textContent = `${msg.pct}%`;
+            } else if (msg.type === 'DONE') {
+              resolve(msg);
+            } else if (msg.type === 'ERROR') {
+              reject(new Error(msg.message));
             }
-          }
+          };
+          worker.onerror = (err) => reject(new Error(err.message || 'Batch worker crashed.'));
 
-          if (f % 35 === 0) {
-            const pct = Math.min(98, Math.round((f / totalPassFrames) * 100));
-            batchProgressBar.style.width = pct + '%';
-            batchProgressText.textContent = `${pct}%`;
-            await new Promise(r => setTimeout(r, 0));
-          }
-        }
+          const wasmCopy = assets.wasmBytes.slice(0);
+          const modelCopy = assets.modelBytes.slice(0);
+          const rawCopy = new Float32Array(rawSamples);
 
-        if (typeof dfMod.df_free === 'function') {
-          try { dfMod.df_free(statePtr); } catch (_) {}
-        }
+          worker.postMessage(
+            {
+              type: 'RUN_BATCH',
+              dfJsCode: assets.dfJsCode,
+              wasmBytes: wasmCopy,
+              modelBytes: modelCopy,
+              rawSamples: rawCopy,
+              outGain
+            },
+            [wasmCopy, modelCopy, rawCopy.buffer]
+          );
+        });
 
-        const elapsedMs = performance.now() - t0;
-        const durationSec = totalSamples / SAMPLE_RATE;
+        batchRawAudio = result.rawSamples;
+        batchCleanAudio = result.cleanSamples;
+        const elapsedMs = result.elapsedMs;
+        const durationSec = batchRawAudio.length / SAMPLE_RATE;
         const rtFactor = (durationSec * 1000) / Math.max(1, elapsedMs);
-
-        batchRawAudio = rawSamples;
-        batchCleanAudio = alignedClean;
 
         batchProgressText.textContent = 'Rendering spectrograms...';
         await new Promise(r => setTimeout(r, 0));
@@ -2300,7 +2356,6 @@
         const decoded = await decodeCtx.decodeAudioData(arrayBuf);
         await decodeCtx.close();
 
-        // Resample to 48 kHz mono via OfflineAudioContext
         const outLen = Math.ceil(decoded.duration * SAMPLE_RATE);
         const offline = new OfflineAudioContext(1, outLen, SAMPLE_RATE);
         const src = offline.createBufferSource();
