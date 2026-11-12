@@ -1,1 +1,0 @@
-python -c "import sounddevice as sd, numpy as np; print('Speaking test active (Ctrl+C to quit)...'); sd.Stream(channels=1, samplerate=48000, blocksize=960, callback=lambda ind, outd, f, t, s: (outd.__setitem__(slice(None), ind * 2.0), print(f'Mic Level: {np.abs(ind).mean():.4f}', end='\r'))).start(); input()"
