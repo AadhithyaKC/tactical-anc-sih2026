@@ -1,241 +1,85 @@
-# Tactical AI-ANC: Neural Active Noise Cancellation & Speech Enhancement
+# Tactical AI-ANC
 
-[![Smart India Hackathon](https://img.shields.io/badge/SIH-2026-orange.svg)](https://sih.gov.in/)
-[![Problem Statement](https://img.shields.io/badge/Problem%20Statement-SIH26052-blue.svg)](https://sih.gov.in/)
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+Real-time AI noise suppression and speech enhancement using DeepFilterNet, built for low-latency uplink audio streaming[cite: 3].
 
-A real-time, low-latency neural active noise cancellation (ANC) and speech enhancement system built on **DeepFilterNet** and designed for tactical communications, field operations, and edge streaming.
+## Features
 
----
+- Real-time neural noise suppression on microphone input[cite: 3]
+- Decoupled worker-thread inference with zero-allocation ring buffers for drop-free audio I/O[cite: 3, 4]
+- Offline batch processing with input vs. cleaned spectrogram comparison[cite: 3, 4]
+- Dual-audio live recording to capture raw and cleaned `.wav` files simultaneously[cite: 3, 4]
+- Instant export of a rolling 10-second audio history buffer[cite: 3, 4]
 
-## Table of Contents
+## Requirements
 
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [Architecture & Mechanics](#architecture--mechanics)
-- [System Requirements](#system-requirements)
-- [Installation Guide](#installation-guide)
-  - [Prerequisites](#prerequisites)
-  - [Option A: Standard pip Installation](#option-a-standard-pip-installation)
-  - [Option B: Fast uv Installation](#option-b-fast-uv-installation)
-- [Running the Application](#running-the-application)
-  - [Interactive Real-Time Mode](#interactive-real-time-mode)
-  - [Batch / Offline Mode](#batch--offline-mode)
-  - [Using the Windows One-Click Launcher](#using-the-windows-one-click-launcher)
-- [Live Controls & Keybindings](#live-controls--keybindings)
-- [Directory Structure](#directory-structure)
-- [Troubleshooting & Audio Setup](#troubleshooting--audio-setup)
-- [Third-Party Acknowledgements](#third-party-acknowledgements)
-- [License](#license)
+- Windows 10/11 (uses `msvcrt` for non-blocking terminal hotkeys)
+- Python 3.9+[cite: 3]
+- Dependencies listed in `requirements.txt` (`torch`, `torchaudio`, `deepfilternet`, `numpy`, `sounddevice`, `soundfile`, `matplotlib`, `colorama`)[cite: 6]
 
----
-
-## Overview
-
-High-noise environments (tactical gear, combat vehicles, industrial machinery, and field headsets) degrade verbal comprehension and overload traditional spectral-subtraction filters.
-
-**Tactical AI-ANC** leverages deep filtering algorithms to isolate speech formants and suppress non-stationary acoustic noise in sub-10ms frame budgets. It incorporates a zero-allocation ring buffer, continuous dual-stream recording (raw vs. enhanced), and spectral diagnostic tools.
-
----
-
-## Key Features
-
-- **Real-Time Stream Enhancement**: Ultra-low-latency neural speech filtering on live microphone feeds.
-- **Zero-Allocation Ring Buffer**: Eliminates memory fragmentation and audio frame drops during extended streaming sessions.
-- **Dual-Audio Live Recording**: Concurrently exports separate uncompressed `.wav` recordings for unprocessed mic input and denoised output.
-- **Rolling History Buffer**: Instant one-key extraction of the most recent 10 seconds of streaming audio (`demo_raw.wav` and `demo_cleaned.wav`).
-- **Offline Batch Processing**: Enhances pre-recorded audio files with automatic side-by-side spectrogram generation for signal inspection.
-- **Cross-Platform Compatibility**: Tested on Windows 10/11 with support for standard PortAudio-compatible hardware.
-
----
-
-## Architecture & Mechanics
-
-```
- [Microphone Input] 
-         │
-         ▼
- [PortAudio Stream Callback]
-         │
-         ▼
- [Zero-Allocation Ring Buffer]
-         │
-         ▼
- [DeepFilterNet Inference Engine] ◄── [Trained Weights / PyTorch Runtime]
-         │
-         ├──► [Real-Time Audio Output / Headphones]
-         │
-         └──► [Dual Storage Engine] ──► (Rolling Buffer / Live Capture .wav)
-```
-
-1. **Audio Ingestion**: Captured at 48 kHz via `sounddevice` and buffered into frame chunks matching DeepFilterNet's internal hop size.
-2. **Filtering**: Two-stage deep filtering using ERB (Equivalent Rectangular Bandwidth) scale gain calculation followed by complex spectral filtering.
-3. **Latency Control**: Bypasses operating-system mixing layers where possible to deliver real-time feedback with minimal phase distortion.
-
----
-
-## System Requirements
-
-- **Operating System**: Windows 10/11, Linux, or macOS.
-- **Python**: Version 3.9, 3.10, or 3.11.
-- **Hardware**:
-  - Dedicated microphone or communications headset.
-  - Headphones (strongly recommended to avoid acoustic feedback loops during live output monitoring).
-  - Optional: CUDA-capable NVIDIA GPU for accelerated batched inferencing.
-
----
-
-## Installation Guide
-
-### Prerequisites
-
-Clone the repository and enter the project folder:
-
-```bash
-git clone https://github.com/AadhithyaKC/tactical-anc-sih2026.git
-cd tactical-anc-sih2026
-```
-
----
-
-### Option A: Standard `pip` Installation
-
-1. **Create and activate a virtual environment:**
-
-   ```powershell
-   python -m venv venv
-   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-   .\venv\Scripts\Activate.ps1
-   ```
-
-2. **Install dependencies:**
-
-   - **For Standard / CPU Systems:**
-     ```powershell
-     pip install torch torchaudio deepfilternet sounddevice soundfile matplotlib colorama
-     ```
-
-   - **For NVIDIA GPU Systems (CUDA 12.1):**
-     ```powershell
-     pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
-     pip install deepfilternet sounddevice soundfile matplotlib colorama
-     ```
-
----
-
-### Option B: Fast `uv` Installation
-
-[`uv`](https://github.com/astral-sh/uv) installs packages significantly faster through parallel downloads and global wheel caching.
-
-1. **Install `uv` (if not already installed):**
-
-   ```powershell
-   pip install uv
-   # Or via official installer:
-   # powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-   ```
-
-2. **Create the environment and install:**
-
-   ```powershell
-   uv venv venv
-   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-   .\venv\Scripts\Activate.ps1
-   uv pip install torch torchaudio deepfilternet sounddevice soundfile matplotlib colorama
-   ```
-
----
-
-## Running the Application
-
-### Interactive Real-Time Mode
-
-1. Activate your virtual environment:
-   ```powershell
-   .\venv\Scripts\Activate.ps1
-   ```
-
-2. Start the processing engine:
-   ```powershell
-   python stream_windows.py
-   ```
-
-3. Select your hardware devices:
-   - Input: Choose the index corresponding to your microphone.
-   - Output: Choose the index corresponding to your headphones or monitoring speakers.
-
----
-
-### Batch / Offline Mode
-
-To clean pre-recorded `.wav` files without microphone streaming, pass the input path directly:
+### Option 1: Install using `pip`
 
 ```powershell
-python -m df.enhance --output-dir ./enhanced_audio path/to/noisy_recording.wav
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-This generates:
-- Cleaned speech audio (`.wav`)
-- Spectrogram visual comparison showing noise attenuation across frequency bands
+### Option 2: Install using `uv` (Faster)
 
----
-
-### Using the Windows One-Click Launcher
-
-For quick deployment on field machines, double-click `Launch_ANC.bat` from the root directory. This batch script automatically activates the local `venv/` and starts `stream_windows.py`.
-
----
-
-## Live Controls & Keybindings
-
-While real-time mode is running in the terminal:
-
-| Key | Function | Description |
-|:---:|---|---|
-| <kbd>SPACE</kbd> | **Toggle ANC** | Switch between raw pass-through and neural noise cancellation |
-| <kbd>A</kbd> | **Dual Record** | Start/stop concurrent recording of raw and cleaned audio streams |
-| <kbd>R</kbd> | **Dump Rolling Buffer** | Immediately save the last 10 seconds of raw and clean audio to `.wav` |
-| <kbd>Q</kbd> / <kbd>ESC</kbd> | **Exit** | Gracefully terminate audio streams, flush buffers, and exit |
-
----
-
-## Directory Structure
-
-```text
-tactical-anc-sih2026/
-├── .gitignore               # Ignores venv/, build artifacts, and saved audio
-├── Launch_ANC.bat           # Windows quick-launch executable script
-├── README.md                # Project documentation and specifications
-├── stream_windows.py        # Core real-time stream loop, ring buffer, & UI
-├── E drive access.txt       # Local environment notes & path reference
-└── Mic.txt                  # Audio device configurations & interface indices
+```powershell
+# Note: uv must be installed separately first (pip install uv)
+uv venv venv
+uv pip install -r requirements.txt
 ```
 
----
+## How to Run
 
-## Troubleshooting & Audio Setup
+### Quick Launch (Windows)
 
-- **Acoustic Feedback / Howling**: If you hear loud screeching when starting the engine, your microphone is picking up the output from your speakers. **Switch to headphones** or select a different output device.
-- **PortAudio Underflow / Stuttering**:
-  - Close other background applications utilizing high CPU or exclusive audio locks (e.g., Discord, ASIO DAW sessions).
-  - Increase the buffer block size within `stream_windows.py` if running on slower dual-core hardware.
-- **PowerShell Script Execution Error**: Run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` before activating `venv`.
+Double-click `run.bat` (or `launch.bat`) to activate the virtual environment and start the application automatically.
 
----
+### Manual Launch
 
-## Third-Party Acknowledgements
+1. Activate your virtual environment[cite: 3]:
 
-- **[DeepFilterNet](https://github.com/Rikorose/DeepFilterNet)** (Hendrik Schröter): Full neural speech enhancement architecture, model checkpoints, and deep filtering engine.
-- **[PyTorch](https://pytorch.org/) & [torchaudio](https://pytorch.org/audio/)**: Tensor compute backend and audio preprocessing utilities.
-- **[PortAudio](http://www.portaudio.com/) & [python-sounddevice](https://python-sounddevice.readthedocs.io/)**: Low-latency, multi-platform streaming audio I/O bindings.
-- **[SoundFile](https://python-soundfile.readthedocs.io/)**: Clean 24-bit/16-bit PCM `.wav` export and serialization.
-- **[Matplotlib](https://matplotlib.org/)**: Spectral visualization and signal analysis utilities.
-- **[Colorama](https://pypi.org/project/colorama/)**: ANSI escape character support for the live terminal status UI.
-- **[Astral uv](https://github.com/astral-sh/uv)**: Next-generation fast packaging and environment tooling.
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\venv\Scripts\Activate.ps1
+```
 
----
+2. Start the program[cite: 3]:
+
+```bash
+python stream_windows.py
+```
+
+3. Select your input (microphone) and output (headphones/speakers) device indices from the hardware prompt[cite: 3, 4].
+
+## Controls (Real-Time Mode)
+
+- `SPACE`: Toggle AI noise suppression ON/OFF[cite: 3, 4]
+- `A`: Start/Stop dual-audio live recording (`captured_<n>_raw.wav` & `captured_<n>_cleaned.wav`)[cite: 3, 4]
+- `R`: Export rolling 10-second buffer (`demo_raw.wav` and `demo_cleaned.wav`)[cite: 3, 4]
+- `Q` / `ESC`: Exit back to main menu[cite: 3, 4]
+
+## Troubleshooting
+
+If no audio is detected or you want to verify microphone input levels outside the main app, run this quick loopback check with your virtual environment activated[cite: 2, 3]:
+
+```powershell
+python -c "import sounddevice as sd, numpy as np; print('Speaking test active (Ctrl+C to quit)...'); sd.Stream(channels=1, samplerate=48000, blocksize=960, callback=lambda ind, outd, f, t, s: (outd.__setitem__(slice(None), ind * 2.0), print(f'Mic Level: {np.abs(ind).mean():.4f}', end='\r'))).start(); input()"
+```
 
 ## License
 
-This project is released under the [MIT License](LICENSE).
+Licensed under the [MIT License](LICENSE.md)[cite: 8].
+
+## Acknowledgements
+
+- [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet) by Hendrik Schröter for the neural speech enhancement framework and pre-trained models[cite: 3].
+- [PyTorch](https://pytorch.org/) & [torchaudio](https://pytorch.org/audio/) for tensor computation and neural network runtime[cite: 3].
+- [PortAudio](http://www.portaudio.com/) and [python-sounddevice](https://python-sounddevice.readthedocs.io/) for low-latency audio I/O streaming[cite: 3].
+- [SoundFile](https://python-soundfile.readthedocs.io/) for audio encoding and disk I/O[cite: 3].
+- [Matplotlib](https://matplotlib.org/) for spectrogram visualization[cite: 3].
+- [Colorama](https://pypi.org/project/colorama/) for terminal HUD styling[cite: 3].
+- [Astral uv](https://github.com/astral-sh/uv) for fast Python environment and package management[cite: 3].
