@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Noise Cancellation — Live Audio Studio</title>
+  <style>
+    :root {
+      --bg-canvas: #000000;
+      --bg-card: rgba(24, 24, 27, 0.72);
+      --bg-subcard: rgba(36, 36, 40, 0.55);
+      --bg-control: rgba(44, 44, 48, 0.7);
+      --bg-control-hover: rgba(58, 58, 64, 0.85);
+      --border-hairline: rgba(255, 255, 255, 0.08);
+      --border-specular: rgba(255, 255, 255, 0.14);
+      --text-primary: #f5f5f7;
+      --text-secondary: #a1a1a6;
+      --text-tertiary: #6e6e73;
+      --blue: #0a84ff;
+      --green: #30d158;
+      --amber: #ff9f0a;
+      --red: #ff453a;
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(120, 130, 155, 0.14), transparent),
+        radial-gradient(ellipse 60% 40% at 85% 100%, rgba(10, 132, 255, 0.07), transparent);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.45;
+    }
+
+    /* Header */
+    .header {
+      max-width: 1240px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 28px 28px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .title-group h1 {
+      font-size: 1.55rem;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: var(--text-primary);
+    }
+
+    .title-group p {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      font-weight: 400;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-hairline);
+      backdrop-filter: blur(20px);
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-tertiary);
+      transition: all 0.25s ease;
+    }
+
+    .dot.live {
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(48, 209, 88, 0.65);
+    }
+
+    .dot.loading {
+      background: var(--amber);
+      box-shadow: 0 0 8px rgba(255, 159, 10, 0.65);
+      animation: breathe 1.2s ease-in-out infinite;
+    }
+
+    .dot.recording {
+      background: var(--red);
+      box-shadow: 0 0 8px rgba(255, 69, 58, 0.75);
+      animation: breathe 1.4s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Main Grid */
+    .container {
+      max-width: 1240px;
+      width: 100%;
+      margin: 12px auto 40px;
+      padding: 0 28px;
+      display: grid;
+      grid-template-columns: 1fr 370px;
+      gap: 20px;
+      flex: 1;
+    }
+
+    @media (max-width: 980px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Frosted Glass Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-hairline);
+      border-top-color: var(--border-specular);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(28px) saturate(160%);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text-primary);
+    }
+
+    /* Mode Badge */
+    .mode-status {
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 999px;
+      transition: all 0.2s ease;
+    }
+
+    .mode-status.off {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-hairline);
+    }
+
+    .mode-status.on {
+      background: rgba(48, 209, 88, 0.14);
+      color: var(--green);
+      border: 1px solid rgba(48, 209, 88, 0.35);
+    }
+
+    /* Visualizer */
+    .visualizer-wrap {
+      position: relative;
+      height: 250px;
+      background: #070709;
+      border-radius: 14px;
+      border: 1px solid var(--border-hairline);
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Apple-style Segmented Control */
+    .segmented-control {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      display: inline-flex;
+      background: rgba(28, 28, 32, 0.85);
+      backdrop-filter: blur(12px);
+      padding: 3px;
+      border-radius: 9px;
+      border: 1px solid var(--border-hairline);
+    }
+
+    .seg-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 0.76rem;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .seg-btn.active {
+      background: rgba(255, 255, 255, 0.14);
+      color: var(--text-primary);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Clean Stat Strip */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .stat-box {
+      background: var(--bg-subcard);
+      border: 1px solid var(--border-hairline);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .stat-label {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .stat-number {
+      font-size: 1.45rem;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: var(--text-primary);
+      margin-top: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Level Meters */
+    .levels-panel {
+      background: var(--bg-subcard);
+      border: 1px solid var(--border-hairline);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .level-item {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .level-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .level-name {
+      color: var(--text-secondary);
+    }
+
+    .level-db {
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--text-tertiary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .track {
+      height: 8px;
+      background: rgba(0, 0, 0, 0.55);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      transition: width 0.045s linear;
+    }
+
+    .fill.raw {
+      background: linear-gradient(90deg, #64748b, #e2e8f0);
+    }
+
+    .fill.clean {
+      background: linear-gradient(90deg, #0a84ff, #30d158);
+    }
+
+    /* Primary Controls */
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-radius: 12px;
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-control);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--bg-control-hover);
+      border-color: var(--border-specular);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.99);
+    }
+
+    .btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .btn-start {
+      background: var(--text-primary);
+      color: #000000;
+      font-weight: 600;
+      border-color: transparent;
+    }
+
+    .btn-start:hover:not(:disabled) {
+      background: #ffffff;
+    }
+
+    .btn-start.active {
+      background: rgba(255, 69, 58, 0.16);
+      color: var(--red);
+      border-color: rgba(255, 69, 58, 0.4);
+    }
+
+    .btn-anc.active {
+      background: rgba(48, 209, 88, 0.16);
+      color: var(--green);
+      border-color: rgba(48, 209, 88, 0.4);
+    }
+
+    .btn-rec.active {
+      background: rgba(255, 69, 58, 0.16);
+      color: var(--red);
+      border-color: rgba(255, 69, 58, 0.4);
+    }
+
+    .shortcut {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 3px 7px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.25);
+      color: inherit;
+      opacity: 0.75;
+    }
+
+    .btn-start:not(.active) .shortcut {
+      background: rgba(0, 0, 0, 0.1);
+      color: #000000;
+    }
+
+    /* Sidebar Controls */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+    }
+
+    .field-label {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .field-value {
+      color: var(--text-primary);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    select {
+      width: 100%;
+      padding: 11px 14px;
+      border-radius: 10px;
+      background: rgba(14, 14, 16, 0.9);
+      border: 1px solid var(--border-hairline);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 0.84rem;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+
+    select:focus {
+      border-color: var(--blue);
+    }
+
+    /* Sleek Range Sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      transition: transform 0.12s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.08);
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border-hairline);
+      margin: 2px 0;
+    }
+
+    /* Bright Activity Feed */
+    .activity-log {
+      background: rgba(10, 10, 12, 0.75);
+      border: 1px solid var(--border-hairline);
+      border-radius: 12px;
+      padding: 12px 14px;
+      height: 135px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      font-size: 0.78rem;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 8px;
+      color: var(--text-primary);
+      line-height: 1.35;
+    }
+
+    .log-time {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .log-entry.good .log-msg { color: #32d74b; font-weight: 500; }
+    .log-entry.warn .log-msg { color: #ffd60a; font-weight: 500; }
+  </style>
+</head>
+<body>
+
+  <!-- Clean Studio Header -->
+  <header class="header">
+    <div class="title-group">
+      <h1>Noise Cancellation</h1>
+      <p>Real-time voice isolation · 48 kHz studio processing</p>
+    </div>
+
+    <div class="status-bar">
+      <div class="pill">
+        <span id="streamDot" class="dot"></span>
+        <span id="engineStatus">Ready</span>
+      </div>
+      <div class="pill">
+        <span id="recDot" class="dot"></span>
+        <span id="recStatusText">Not Recording</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="container">
+    <!-- Left Card: Visualizer, Levels & Transport -->
+    <section class="card">
+      <div class="card-header">
+        <span class="card-title">Live Audio</span>
+        <span id="ancBadge" class="mode-status off">Off — Raw Mic</span>
+      </div>
+
+      <!-- Visualizer -->
+      <div class="visualizer-wrap">
+        <canvas id="dspCanvas" width="800" height="250"></canvas>
+        <div class="segmented-control">
+          <button id="tabSpec" class="seg-btn active">Frequency</button>
+          <button id="tabWave" class="seg-btn">Waveform</button>
+        </div>
+      </div>
+
+      <!-- Key Stats -->
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-label">Latency</div>
+          <div class="stat-number" id="latencyVal">0.0 ms</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Noise Reduction</div>
+          <div class="stat-number" id="attenVal">0.0 dB</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Replay Buffer</div>
+          <div class="stat-number">10.0 sec</div>
+        </div>
+      </div>
+
+      <!-- Input & Output Meters -->
+      <div class="levels-panel">
+        <div class="level-item">
+          <div class="level-top">
+            <span class="level-name">Microphone Input</span>
+            <span class="level-db" id="inDbText">-inf dB</span>
+          </div>
+          <div class="track">
+            <div id="inBar" class="fill raw"></div>
+          </div>
+        </div>
+
+        <div class="level-item">
+          <div class="level-top">
+            <span class="level-name">Cleaned Output</span>
+            <span class="level-db" id="outDbText">-inf dB</span>
+          </div>
+          <div class="track">
+            <div id="outBar" class="fill clean"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="button-grid">
+        <button id="startBtn" class="btn btn-start">
+          <span id="startBtnText">Start Audio</span>
+          <span class="shortcut">ENTER</span>
+        </button>
+
+        <button id="toggleAncBtn" class="btn btn-anc" disabled>
+          <span>Noise Cancellation</span>
+          <span class="shortcut">SPACE</span>
+        </button>
+
+        <button id="liveRecBtn" class="btn btn-rec" disabled>
+          <span id="liveRecText">Record Audio</span>
+          <span class="shortcut">A</span>
+        </button>
+
+        <button id="exportBufBtn" class="btn" disabled>
+          <span>Save Last 10 Seconds</span>
+          <span class="shortcut">R</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Right Card: Devices, Tuning & Activity -->
+    <aside class="card">
+      <div class="card-header">
+        <span class="card-title">Audio Setup</span>
+      </div>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">Microphone</span>
+        </div>
+        <select id="inputSelect">
+          <option value="">System Default Microphone</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">Headphones or Speakers</span>
+        </div>
+        <select id="outputSelect">
+          <option value="">System Default Output</option>
+        </select>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">Voice Boost</span>
+          <span class="field-value" id="gainValText">2.5×</span>
+        </div>
+        <input id="gainSlider" type="range" min="0.5" max="4.0" step="0.1" value="2.5" />
+      </div>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">Filter Strength</span>
+          <span class="field-value" id="blendValText">90% Filtered · 10% Natural</span>
+        </div>
+        <input id="blendSlider" type="range" min="50" max="100" step="5" value="90" />
+      </div>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">Headphone Playback</span>
+          <span class="field-value" id="monitorValText">On</span>
+        </div>
+        <button id="muteMonitorBtn" class="btn" style="padding: 11px 14px;">
+          <span id="muteBtnLabel">Mute Playback</span>
+          <span class="shortcut">M</span>
+        </button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field">
+        <div class="field-header">
+          <span class="field-label">Activity</span>
+        </div>
+        <div id="consoleBox" class="activity-log"></div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    // =========================================================================
+    // 1. REAL-TIME AUDIOWORKLET WITH DEEPFILTERNET3 WEBASSEMBLY ENGINE
+    // =========================================================================
+    const workletSource = `
+      // Polyfill TextEncoder & TextDecoder if omitted in AudioWorkletGlobalScope
+      if (typeof TextEncoder === 'undefined') {
+        globalThis.TextEncoder = class {
+          encode(str) {
+            const out = [];
+            for (let i = 0; i < str.length; i++) {
+              let c = str.charCodeAt(i);
+              if (c < 0x80) out.push(c);
+              else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+              else if (c < 0xd800 || c >= 0xe000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+              else {
+                i++;
+                c = 0x10000 + (((c & 0x3ff) << 10) | (str.charCodeAt(i) & 0x3ff));
+                out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 0x3f), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+              }
+            }
+            return new Uint8Array(out);
+          }
+        };
+      }
+
+      if (typeof TextDecoder === 'undefined') {
+        globalThis.TextDecoder = class {
+          decode(bytes) {
+            if (!bytes) return '';
+            const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+            let out = '', i = 0;
+            while (i < arr.length) {
+              const c = arr[i++];
+              if (c < 0x80) out += String.fromCharCode(c);
+              else if (c > 0xbf && c < 0xe0) out += String.fromCharCode(((c & 0x1f) << 6) | (arr[i++] & 0x3f));
+              else if (c > 0xdf && c < 0xf0) out += String.fromCharCode(((c & 0x0f) << 12) | ((arr[i++] & 0x3f) << 6) | (arr[i++] & 0x3f));
+              else {
+                const u = (((c & 0x07) << 18) | ((arr[i++] & 0x3f) << 12) | ((arr[i++] & 0x3f) << 6) | (arr[i++] & 0x3f)) - 0x10000;
+                out += String.fromCharCode(0xd800 + (u >> 10), 0xdc00 + (u & 0x3ff));
+              }
+            }
+            return out;
+          }
+        };
+      }
+
+      if (typeof self === 'undefined') globalThis.self = globalThis;
+      if (typeof performance === 'undefined') globalThis.performance = { now: () => Date.now() };
+
+      class DeepFilterWorkletProcessor extends AudioWorkletProcessor {
+        constructor() {
+          super();
+          this.hopSize = 480; // 10ms frame at 48kHz
+          this.ringCap = 4096;
+
+          this.inRing = new Float32Array(this.ringCap);
+          this.inRead = 0;
+          this.inWrite = 0;
+          this.inCount = 0;
+
+          this.outRing = new Float32Array(this.ringCap);
+          this.outRead = 0;
+          this.outWrite = 480;
+          this.outCount = 480;
+
+          this.rawFrame = new Float32Array(this.hopSize);
+          this.aiFrame = new Float32Array(this.hopSize);
+          this.cleanFrame = new Float32Array(this.hopSize);
+
+          this.dfMod = null;
+          this.dfState = null;
+          this.wasmReady = false;
+
+          this.ancEnabled = false;
+          this.aiGain = 2.5;
+          this.aiBlend = 0.90;
+          this.ceiling = 0.98;
+
+          this.frameCounter = 0;
+          this.timeAccumMs = 0;
+
+          this.port.onmessage = (e) => {
+            const d = e.data;
+            if (d.type === 'INIT_WASM') {
+              try {
+                const createBindings = new Function(d.dfJsCode + '\\nreturn wasm_bindgen;');
+                const dfMod = createBindings();
+                dfMod.initSync(new Uint8Array(d.wasmBytes));
+
+                // Initialize DeepFilterNet3 with 28.0 dB max attenuation limit
+                const statePtr = dfMod.df_create(new Uint8Array(d.modelBytes), 28.0);
+                if (!statePtr) {
+                  throw new Error('df_create returned null state pointer.');
+                }
+
+                const frameLen = dfMod.df_get_frame_length(statePtr);
+                if (frameLen && frameLen !== this.hopSize) {
+                  this.hopSize = frameLen;
+                  this.rawFrame = new Float32Array(frameLen);
+                  this.aiFrame = new Float32Array(frameLen);
+                  this.cleanFrame = new Float32Array(frameLen);
+                }
+
+                this.dfMod = dfMod;
+                this.dfState = statePtr;
+                this.wasmReady = true;
+                this.port.postMessage({ type: 'WASM_READY', hopSize: this.hopSize });
+              } catch (err) {
+                this.port.postMessage({ type: 'WASM_ERROR', message: err.message || String(err) });
+              }
+            } else if (d.type === 'SET_ANC') {
+              this.ancEnabled = d.enabled;
+            } else if (d.type === 'SET_GAIN') {
+              this.aiGain = d.gain;
+            } else if (d.type === 'SET_BLEND') {
+              this.aiBlend = d.blend;
+            } else if (d.type === 'FREE_WASM') {
+              if (this.dfMod && this.dfState && typeof this.dfMod.df_free === 'function') {
+                this.dfMod.df_free(this.dfState);
+              }
+              this.dfState = null;
+              this.wasmReady = false;
+            }
+          };
+        }
+
+        process(inputs, outputs) {
+          const input = inputs[0];
+          const output = outputs[0];
+          if (!input || !input[0] || !output || !output[0]) return true;
+
+          const inCh = input[0];
+          const outCh = output[0];
+          const blockLen = inCh.length;
+
+          let inPeak = 0;
+          for (let i = 0; i < blockLen; i++) {
+            const s = inCh[i];
+            const abs = s < 0 ? -s : s;
+            if (abs > inPeak) inPeak = abs;
+
+            this.inRing[this.inWrite] = s;
+            this.inWrite = (this.inWrite + 1) % this.ringCap;
+            this.inCount++;
+          }
+
+          while (this.inCount >= this.hopSize) {
+            const t0 = performance.now();
+
+            for (let i = 0; i < this.hopSize; i++) {
+              this.rawFrame[i] = this.inRing[this.inRead];
+              this.inRead = (this.inRead + 1) % this.ringCap;
+            }
+            this.inCount -= this.hopSize;
+
+            if (this.ancEnabled && this.wasmReady && this.dfState) {
+              // Run DeepFilterNet3 neural inference on 480-sample frame
+              this.dfMod.df_process_frame(this.dfState, this.rawFrame, this.aiFrame);
+
+              const wet = this.aiBlend;
+              const dry = 1.0 - wet;
+              const gain = this.aiGain;
+
+              for (let i = 0; i < this.hopSize; i++) {
+                let mixed = (this.aiFrame[i] * wet + this.rawFrame[i] * dry) * gain;
+                mixed = Math.tanh(mixed);
+                if (mixed > this.ceiling) mixed = this.ceiling;
+                if (mixed < -this.ceiling) mixed = -this.ceiling;
+                this.cleanFrame[i] = mixed;
+              }
+            } else {
+              for (let i = 0; i < this.hopSize; i++) {
+                let s = this.rawFrame[i];
+                if (s > this.ceiling) s = this.ceiling;
+                if (s < -this.ceiling) s = -this.ceiling;
+                this.cleanFrame[i] = s;
+              }
+            }
+
+            for (let i = 0; i < this.hopSize; i++) {
+              this.outRing[this.outWrite] = this.cleanFrame[i];
+              this.outWrite = (this.outWrite + 1) % this.ringCap;
+            }
+            this.outCount += this.hopSize;
+
+            this.port.postMessage({
+              type: 'AUDIO_HOP',
+              raw: this.rawFrame.slice(),
+              clean: this.cleanFrame.slice()
+            });
+
+            this.timeAccumMs += (performance.now() - t0);
+            this.frameCounter++;
+          }
+
+          let outPeak = 0;
+          for (let i = 0; i < blockLen; i++) {
+            let sample = 0;
+            if (this.outCount > 0) {
+              sample = this.outRing[this.outRead];
+              this.outRead = (this.outRead + 1) % this.ringCap;
+              this.outCount--;
+            }
+            outCh[i] = sample;
+            if (output.length > 1) output[1][i] = sample;
+
+            const abs = sample < 0 ? -sample : sample;
+            if (abs > outPeak) outPeak = abs;
+          }
+
+          if (this.frameCounter >= 8) {
+            this.port.postMessage({
+              type: 'METRICS',
+              inPeak,
+              outPeak,
+              avgMs: this.timeAccumMs / this.frameCounter
+            });
+            this.frameCounter = 0;
+            this.timeAccumMs = 0;
+          }
+
+          return true;
+        }
+      }
+      registerProcessor('deepfilter-worklet', DeepFilterWorkletProcessor);
+    `;
+
+    // =========================================================================
+    // 2. APPLICATION STATE & 10-SECOND ROLLING BUFFERS
+    // =========================================================================
+    const SAMPLE_RATE = 48000;
+    const HISTORY_SAMPLES = 10 * SAMPLE_RATE;
+
+    const rawHistoryBuf = new Float32Array(HISTORY_SAMPLES);
+    const cleanHistoryBuf = new Float32Array(HISTORY_SAMPLES);
+    let historyWriteIdx = 0;
+
+    let liveRawChunks = [];
+    let liveCleanChunks = [];
+
+    let cachedAssets = null;
+    let audioCtx = null;
+    let workletNode = null;
+    let analyserNode = null;
+    let monitorGainNode = null;
+    let mediaStream = null;
+
+    let isRunning = false;
+    let wasmLoaded = false;
+    let ancEnabled = false;
+    let isRecordingLive = false;
+    let monitorMuted = false;
+    let visMode = 'spec';
+    let animFrameId = null;
+
+    const startBtn = document.getElementById('startBtn');
+    const startBtnText = document.getElementById('startBtnText');
+    const toggleAncBtn = document.getElementById('toggleAncBtn');
+    const liveRecBtn = document.getElementById('liveRecBtn');
+    const liveRecText = document.getElementById('liveRecText');
+    const exportBufBtn = document.getElementById('exportBufBtn');
+    const muteMonitorBtn = document.getElementById('muteMonitorBtn');
+    const muteBtnLabel = document.getElementById('muteBtnLabel');
+
+    const inputSelect = document.getElementById('inputSelect');
+    const outputSelect = document.getElementById('outputSelect');
+    const gainSlider = document.getElementById('gainSlider');
+    const blendSlider = document.getElementById('blendSlider');
+    const gainValText = document.getElementById('gainValText');
+    const blendValText = document.getElementById('blendValText');
+    const monitorValText = document.getElementById('monitorValText');
+
+    const streamDot = document.getElementById('streamDot');
+    const engineStatus = document.getElementById('engineStatus');
+    const recDot = document.getElementById('recDot');
+    const recStatusText = document.getElementById('recStatusText');
+    const ancBadge = document.getElementById('ancBadge');
+
+    const latencyVal = document.getElementById('latencyVal');
+    const attenVal = document.getElementById('attenVal');
+    const inDbText = document.getElementById('inDbText');
+    const outDbText = document.getElementById('outDbText');
+    const inBar = document.getElementById('inBar');
+    const outBar = document.getElementById('outBar');
+    const consoleBox = document.getElementById('consoleBox');
+
+    const canvas = document.getElementById('dspCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function addActivity(msg, tone = '') {
+      const now = new Date().toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      const row = document.createElement('div');
+      row.className = `log-entry ${tone}`;
+      row.innerHTML = `<span class="log-time">${now}</span><span class="log-msg">${msg}</span>`;
+      consoleBox.appendChild(row);
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+
+    // =========================================================================
+    // 3. LOAD WEBASSEMBLY ENGINE & MODEL WEIGHTS
+    // =========================================================================
+    async function loadEngineAssets() {
+      if (cachedAssets) return cachedAssets;
+
+      const [jsRes, wasmRes, modelRes] = await Promise.all([
+        fetch('./df.js'),
+        fetch('./df_bg.wasm'),
+        fetch('./DeepFilterNet3_ll_onnx.tar.gz')
+      ]);
+
+      if (!jsRes.ok || !wasmRes.ok || !modelRes.ok) {
+        throw new Error('Missing df.js, df_bg.wasm, or DeepFilterNet3_ll_onnx.tar.gz in docs/.');
+      }
+
+      const [dfJsCode, wasmBytes, modelBytes] = await Promise.all([
+        jsRes.text(),
+        wasmRes.arrayBuffer(),
+        modelRes.arrayBuffer()
+      ]);
+
+      cachedAssets = { dfJsCode, wasmBytes, modelBytes };
+      return cachedAssets;
+    }
+
+    // =========================================================================
+    // 4. HARDWARE DEVICES & WAV FILE EXPORT
+    // =========================================================================
+    async function populateDevices() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const inputs = devices.filter(d => d.kind === 'audioinput');
+        const outputs = devices.filter(d => d.kind === 'audiooutput');
+
+        if (inputs.length > 0) {
+          const prevIn = inputSelect.value;
+          inputSelect.innerHTML = inputs.map((d, i) =>
+            `<option value="${d.deviceId}">${d.label || 'Microphone ' + (i + 1)}</option>`
+          ).join('');
+          if (prevIn) inputSelect.value = prevIn;
+        }
+        if (outputs.length > 0) {
+          const prevOut = outputSelect.value;
+          outputSelect.innerHTML = outputs.map((d, i) =>
+            `<option value="${d.deviceId}">${d.label || 'Output ' + (i + 1)}</option>`
+          ).join('');
+          if (prevOut) outputSelect.value = prevOut;
+        }
+      } catch (e) {
+        // Permissions granted on start
+      }
+    }
+
+    function encodeWavFile(samples, sampleRate = 48000) {
+      const buffer = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buffer);
+      const writeStr = (offset, str) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      };
+
+      writeStr(0, 'RIFF');
+      view.setUint32(4, 36 + samples.length * 2, true);
+      writeStr(8, 'WAVE');
+      writeStr(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, 'data');
+      view.setUint32(40, samples.length * 2, true);
+
+      let offset = 44;
+      for (let i = 0; i < samples.length; i++, offset += 2) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function triggerDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    function playCueBeep(freq, duration = 0.065) {
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.07, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // =========================================================================
+    // 5. STUDIO VISUALIZER
+    // =========================================================================
+    function startVisualizer() {
+      const freqBins = new Uint8Array(analyserNode.frequencyBinCount);
+      const timeDomain = new Uint8Array(analyserNode.fftSize);
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+
+      function render() {
+        if (!isRunning) return;
+        animFrameId = requestAnimationFrame(render);
+
+        if (visMode === 'spec') {
+          analyserNode.getByteFrequencyData(freqBins);
+          tempCtx.drawImage(canvas, 0, 0);
+          ctx.drawImage(tempCanvas, -2, 0);
+
+          const h = canvas.height;
+          const usableBins = Math.floor(freqBins.length * 0.65);
+
+          for (let y = 0; y < h; y++) {
+            const binIdx = Math.floor(((h - 1 - y) / h) * usableBins);
+            const ratio = freqBins[binIdx] / 255;
+
+            let r = 7, g = 7, b = 9;
+            if (ratio > 0.04) {
+              if (ancEnabled) {
+                r = Math.floor(30 + 215 * Math.pow(ratio, 2.2));
+                g = Math.floor(90 + 165 * Math.pow(ratio, 0.9));
+                b = Math.floor(140 + 115 * Math.pow(ratio, 1.1));
+              } else {
+                r = Math.floor(60 + 195 * Math.pow(ratio, 1.0));
+                g = Math.floor(65 + 145 * Math.pow(ratio, 1.3));
+                b = Math.floor(85 + 90 * Math.pow(ratio, 1.8));
+              }
+            }
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(canvas.width - 2, y, 2, 1);
+          }
+        } else {
+          analyserNode.getByteTimeDomainData(timeDomain);
+          ctx.fillStyle = '#070709';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(0, canvas.height / 2);
+          ctx.lineTo(canvas.width, canvas.height / 2);
+          ctx.stroke();
+
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = ancEnabled ? '#30d158' : '#e5e5ea';
+          ctx.beginPath();
+
+          const sliceWidth = canvas.width / timeDomain.length;
+          let x = 0;
+          for (let i = 0; i < timeDomain.length; i++) {
+            const v = timeDomain[i] / 128.0;
+            const y = (v * canvas.height) / 2;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+            x += sliceWidth;
+          }
+          ctx.lineTo(canvas.width, canvas.height / 2);
+          ctx.stroke();
+        }
+      }
+      render();
+    }
+
+    // =========================================================================
+    // 6. STREAM LIFECYCLE & CONTROLS
+    // =========================================================================
+    async function startStream() {
+      startBtn.disabled = true;
+      streamDot.className = 'dot loading';
+      engineStatus.textContent = 'Loading Model...';
+      addActivity('Loading DeepFilterNet3 WebAssembly engine...');
+
+      try {
+        const assets = await loadEngineAssets();
+
+        const audioConstraints = {
+          channelCount: 1,
+          sampleRate: SAMPLE_RATE,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        };
+        if (inputSelect.value) {
+          audioConstraints.deviceId = { exact: inputSelect.value };
+        }
+
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+        await populateDevices();
+
+        audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE, latencyHint: 'interactive' });
+        if (outputSelect.value && typeof audioCtx.setSinkId === 'function') {
+          await audioCtx.setSinkId(outputSelect.value);
+        }
+
+        const blob = new Blob([workletSource], { type: 'application/javascript' });
+        const workletUrl = URL.createObjectURL(blob);
+        await audioCtx.audioWorklet.addModule(workletUrl);
+
+        const source = audioCtx.createMediaStreamSource(mediaStream);
+        workletNode = new AudioWorkletNode(audioCtx, 'deepfilter-worklet');
+        analyserNode = audioCtx.createAnalyser();
+        analyserNode.fftSize = 1024;
+        analyserNode.smoothingTimeConstant = 0.68;
+
+        monitorGainNode = audioCtx.createGain();
+        monitorGainNode.gain.value = monitorMuted ? 0.0 : 1.0;
+
+        workletNode.port.onmessage = (e) => {
+          const d = e.data;
+          if (d.type === 'WASM_READY') {
+            wasmLoaded = true;
+            toggleAncBtn.disabled = false;
+            streamDot.className = 'dot live';
+            engineStatus.textContent = `Live · ${audioCtx.sampleRate / 1000} kHz`;
+            addActivity(`DeepFilterNet3 ready (${d.hopSize}-sample frames).`, 'good');
+          } else if (d.type === 'WASM_ERROR') {
+            streamDot.className = 'dot live';
+            engineStatus.textContent = `Bypass Only · ${audioCtx.sampleRate / 1000} kHz`;
+            addActivity(`Engine error: ${d.message}`, 'warn');
+          } else if (d.type === 'AUDIO_HOP') {
+            const rawHop = d.raw;
+            const cleanHop = d.clean;
+            const len = rawHop.length;
+
+            for (let i = 0; i < len; i++) {
+              rawHistoryBuf[historyWriteIdx] = rawHop[i];
+              cleanHistoryBuf[historyWriteIdx] = cleanHop[i];
+              historyWriteIdx = (historyWriteIdx + 1) % HISTORY_SAMPLES;
+            }
+
+            if (isRecordingLive) {
+              liveRawChunks.push(rawHop);
+              liveCleanChunks.push(cleanHop);
+            }
+          } else if (d.type === 'METRICS') {
+            const { inPeak, outPeak, avgMs } = d;
+            inBar.style.width = Math.min(100, inPeak * 280) + '%';
+            outBar.style.width = Math.min(100, outPeak * 280) + '%';
+
+            inDbText.textContent = inPeak > 1e-5 ? (20 * Math.log10(inPeak)).toFixed(1) + ' dB' : '-inf dB';
+            outDbText.textContent = outPeak > 1e-5 ? (20 * Math.log10(outPeak)).toFixed(1) + ' dB' : '-inf dB';
+            latencyVal.textContent = avgMs.toFixed(1) + ' ms';
+
+            if (ancEnabled && inPeak > 1e-4 && outPeak > 1e-4) {
+              const red = Math.max(0, 20 * Math.log10((inPeak + 1e-5) / (outPeak + 1e-5)));
+              attenVal.textContent = '-' + red.toFixed(1) + ' dB';
+            } else {
+              attenVal.textContent = '0.0 dB';
+            }
+          }
+        };
+
+        // Pass cloned ArrayBuffers so cachedAssets remains reusable on restart
+        workletNode.port.postMessage({
+          type: 'INIT_WASM',
+          dfJsCode: assets.dfJsCode,
+          wasmBytes: assets.wasmBytes.slice(0),
+          modelBytes: assets.modelBytes.slice(0)
+        });
+
+        // Sync current slider values with worklet
+        workletNode.port.postMessage({ type: 'SET_GAIN', gain: parseFloat(gainSlider.value) });
+        workletNode.port.postMessage({ type: 'SET_BLEND', blend: parseInt(blendSlider.value, 10) / 100 });
+
+        source.connect(workletNode);
+        workletNode.connect(analyserNode);
+        analyserNode.connect(monitorGainNode);
+        monitorGainNode.connect(audioCtx.destination);
+
+        isRunning = true;
+        startBtn.disabled = false;
+        startBtn.classList.add('active');
+        startBtnText.textContent = 'Stop Audio';
+
+        liveRecBtn.disabled = false;
+        exportBufBtn.disabled = false;
+
+        startVisualizer();
+      } catch (err) {
+        startBtn.disabled = false;
+        streamDot.className = 'dot';
+        engineStatus.textContent = 'Ready';
+        if (window.location.protocol === 'file:') {
+          addActivity('Open via http://localhost:8000 (not file://) to load WebAssembly.', 'warn');
+        } else {
+          addActivity(`Startup failed: ${err.message}`, 'warn');
+        }
+      }
+    }
+
+    function stopStream() {
+      if (isRecordingLive) toggleLiveRecording();
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      if (workletNode) workletNode.port.postMessage({ type: 'FREE_WASM' });
+      if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+      if (audioCtx) audioCtx.close();
+
+      isRunning = false;
+      wasmLoaded = false;
+      ancEnabled = false;
+      streamDot.className = 'dot';
+      engineStatus.textContent = 'Ready';
+      startBtn.classList.remove('active');
+      startBtnText.textContent = 'Start Audio';
+
+      toggleAncBtn.disabled = true;
+      toggleAncBtn.classList.remove('active');
+      liveRecBtn.disabled = true;
+      exportBufBtn.disabled = true;
+
+      ancBadge.textContent = 'Off — Raw Mic';
+      ancBadge.className = 'mode-status off';
+      inBar.style.width = '0%';
+      outBar.style.width = '0%';
+      latencyVal.textContent = '0.0 ms';
+      attenVal.textContent = '0.0 dB';
+
+      addActivity('Audio stopped.');
+    }
+
+    function toggleAnc() {
+      if (!isRunning || !wasmLoaded || !workletNode) return;
+      ancEnabled = !ancEnabled;
+      workletNode.port.postMessage({ type: 'SET_ANC', enabled: ancEnabled });
+      playCueBeep(ancEnabled ? 880 : 350);
+
+      if (ancEnabled) {
+        ancBadge.textContent = 'Active — Voice Isolated';
+        ancBadge.className = 'mode-status on';
+        toggleAncBtn.classList.add('active');
+        addActivity('Noise cancellation turned on.', 'good');
+      } else {
+        ancBadge.textContent = 'Off — Raw Mic';
+        ancBadge.className = 'mode-status off';
+        toggleAncBtn.classList.remove('active');
+        addActivity('Noise cancellation turned off.');
+      }
+    }
+
+    function toggleLiveRecording() {
+      if (!isRunning) return;
+      if (!isRecordingLive) {
+        liveRawChunks = [];
+        liveCleanChunks = [];
+        isRecordingLive = true;
+        playCueBeep(1200, 0.08);
+        recDot.classList.add('recording');
+        recStatusText.textContent = 'Recording';
+        liveRecBtn.classList.add('active');
+        liveRecText.textContent = 'Stop & Save Recording';
+        addActivity('Recording raw and cleaned audio.');
+      } else {
+        isRecordingLive = false;
+        playCueBeep(600, 0.08);
+        recDot.classList.remove('recording');
+        recStatusText.textContent = 'Not Recording';
+        liveRecBtn.classList.remove('active');
+        liveRecText.textContent = 'Record Audio';
+
+        const totalLen = liveRawChunks.reduce((acc, c) => acc + c.length, 0);
+        const rawMerged = new Float32Array(totalLen);
+        const cleanMerged = new Float32Array(totalLen);
+        let offset = 0;
+        for (let i = 0; i < liveRawChunks.length; i++) {
+          rawMerged.set(liveRawChunks[i], offset);
+          cleanMerged.set(liveCleanChunks[i], offset);
+          offset += liveRawChunks[i].length;
+        }
+
+        triggerDownload(encodeWavFile(rawMerged, SAMPLE_RATE), 'captured_raw.wav');
+        triggerDownload(encodeWavFile(cleanMerged, SAMPLE_RATE), 'captured_cleaned.wav');
+        addActivity(`Saved ${(totalLen / SAMPLE_RATE).toFixed(1)}s recording (.wav).`, 'good');
+      }
+    }
+
+    function exportRollingBuffer() {
+      if (!isRunning) return;
+      const unrolledRaw = new Float32Array(HISTORY_SAMPLES);
+      const unrolledClean = new Float32Array(HISTORY_SAMPLES);
+
+      const tailLen = HISTORY_SAMPLES - historyWriteIdx;
+      unrolledRaw.set(rawHistoryBuf.subarray(historyWriteIdx), 0);
+      unrolledRaw.set(rawHistoryBuf.subarray(0, historyWriteIdx), tailLen);
+
+      unrolledClean.set(cleanHistoryBuf.subarray(historyWriteIdx), 0);
+      unrolledClean.set(cleanHistoryBuf.subarray(0, historyWriteIdx), tailLen);
+
+      triggerDownload(encodeWavFile(unrolledRaw, SAMPLE_RATE), 'demo_raw.wav');
+      triggerDownload(encodeWavFile(unrolledClean, SAMPLE_RATE), 'demo_cleaned.wav');
+      addActivity('Saved last 10 seconds (raw & cleaned).', 'good');
+    }
+
+    function toggleMonitorMute() {
+      monitorMuted = !monitorMuted;
+      if (monitorGainNode && audioCtx) {
+        monitorGainNode.gain.setValueAtTime(monitorMuted ? 0.0 : 1.0, audioCtx.currentTime);
+      }
+      monitorValText.textContent = monitorMuted ? 'Muted' : 'On';
+      muteBtnLabel.textContent = monitorMuted ? 'Unmute Playback' : 'Mute Playback';
+      addActivity(monitorMuted ? 'Headphone playback muted.' : 'Headphone playback unmuted.');
+    }
+
+    // Event Listeners
+    startBtn.addEventListener('click', () => isRunning ? stopStream() : startStream());
+    toggleAncBtn.addEventListener('click', toggleAnc);
+    liveRecBtn.addEventListener('click', toggleLiveRecording);
+    exportBufBtn.addEventListener('click', exportRollingBuffer);
+    muteMonitorBtn.addEventListener('click', toggleMonitorMute);
+
+    gainSlider.addEventListener('input', (e) => {
+      const g = parseFloat(e.target.value);
+      gainValText.textContent = g.toFixed(1) + '×';
+      if (workletNode) workletNode.port.postMessage({ type: 'SET_GAIN', gain: g });
+    });
+
+    blendSlider.addEventListener('input', (e) => {
+      const pct = parseInt(e.target.value, 10);
+      blendValText.textContent = `${pct}% Filtered · ${100 - pct}% Natural`;
+      if (workletNode) workletNode.port.postMessage({ type: 'SET_BLEND', blend: pct / 100 });
+    });
+
+    outputSelect.addEventListener('change', async () => {
+      if (audioCtx && outputSelect.value && typeof audioCtx.setSinkId === 'function') {
+        await audioCtx.setSinkId(outputSelect.value);
+        addActivity('Switched output device.');
+      }
+    });
+
+    document.getElementById('tabSpec').addEventListener('click', (e) => {
+      visMode = 'spec';
+      e.target.classList.add('active');
+      document.getElementById('tabWave').classList.remove('active');
+    });
+
+    document.getElementById('tabWave').addEventListener('click', (e) => {
+      visMode = 'wave';
+      e.target.classList.add('active');
+      document.getElementById('tabSpec').classList.remove('active');
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Enter' && !isRunning) {
+        e.preventDefault();
+        startStream();
+        return;
+      }
+      if (!isRunning) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        toggleAnc();
+      } else if (e.key === 'a' || e.key === 'A') {
+        toggleLiveRecording();
+      } else if (e.key === 'r' || e.key === 'R') {
+        exportRollingBuffer();
+      } else if (e.key === 'm' || e.key === 'M') {
+        toggleMonitorMute();
+      }
+    });
+
+    populateDevices();
+    addActivity('Ready. Click Start Audio to load DeepFilterNet3.');
+  </script>
+</body>
+</html>
