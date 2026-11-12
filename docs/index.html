@@ -893,9 +893,9 @@
         <div class="field">
           <div class="field-header">
             <span class="field-label">Batch Output Gain</span>
-            <span class="field-value" id="batchGainText">1.2×</span>
+            <span class="field-value" id="batchGainText">2.5×</span>
           </div>
-          <input id="batchGainSlider" type="range" min="0.5" max="3.0" step="0.1" value="1.2" />
+          <input id="batchGainSlider" type="range" min="0.5" max="4.0" step="0.1" value="2.5" />
         </div>
       </div>
 
@@ -1146,11 +1146,33 @@
         }
       }
       registerProcessor('deepfilter-worklet', DeepFilterWorkletProcessor);
+
+      // Dedicated silent capture processor for Mode 2 batch recording
+      class BatchCaptureWorkletProcessor extends AudioWorkletProcessor {
+        constructor() {
+          super();
+          this.active = true;
+          this.port.onmessage = (e) => {
+            if (e.data && e.data.type === 'STOP') this.active = false;
+          };
+        }
+        process(inputs, outputs) {
+          if (!this.active) return false;
+          const input = inputs[0];
+          const output = outputs[0];
+          if (output && output[0]) output[0].fill(0);
+          if (input && input[0] && input[0].length > 0) {
+            const copy = new Float32Array(input[0]);
+            this.port.postMessage(copy, [copy.buffer]);
+          }
+          return true;
+        }
+      }
+      registerProcessor('batch-capture-worklet', BatchCaptureWorkletProcessor);
     `;
 
     // =========================================================================
     // 1B. BACKGROUND WEB WORKER FOR MODE 2 BATCH INFERENCE
-    // (Bypasses Chromium's 8 MB main-thread sync WASM compilation limit)
     // =========================================================================
     const batchWorkerSource = `
       let dfMod = null;
@@ -1179,8 +1201,7 @@
 
             const inHop = new Float32Array(hopSize);
             const outHop = new Float32Array(hopSize);
-            const alignedClean = new Float32Array(totalSamples);
-            const outGain = d.outGain;
+            const pureAiClean = new Float32Array(totalSamples);
 
             const t0 = performance.now();
 
@@ -1198,12 +1219,7 @@
               if (outFrameIdx >= 0) {
                 const dstStart = outFrameIdx * hopSize;
                 const writeLen = Math.min(hopSize, totalSamples - dstStart);
-                for (let i = 0; i < writeLen; i++) {
-                  let s = Math.tanh(outHop[i] * outGain);
-                  if (s > 0.98) s = 0.98;
-                  if (s < -0.98) s = -0.98;
-                  alignedClean[dstStart + i] = s;
-                }
+                pureAiClean.set(outHop.subarray(0, writeLen), dstStart);
               }
 
               if (f % 35 === 0) {
@@ -1218,8 +1234,8 @@
 
             const elapsedMs = performance.now() - t0;
             self.postMessage(
-              { type: 'DONE', rawSamples, cleanSamples: alignedClean, elapsedMs },
-              [rawSamples.buffer, alignedClean.buffer]
+              { type: 'DONE', rawSamples, pureAiSamples: pureAiClean, elapsedMs },
+              [rawSamples.buffer, pureAiClean.buffer]
             );
           } catch (err) {
             self.postMessage({ type: 'ERROR', message: err.message || String(err) });
@@ -1252,7 +1268,7 @@
     let monitorGainNode = null;
     let mediaStream = null;
 
-    let activeAppMode = 'live'; // 'live' | 'batch'
+    let activeAppMode = 'live';
     let isRunning = false;
     let isStarting = false;
     let wasmLoaded = false;
@@ -1264,6 +1280,7 @@
 
     // Batch Studio State (Mode 2)
     let batchRawAudio = null;
+    let batchPureAiAudio = null;
     let batchCleanAudio = null;
     let isBatchRecording = false;
     let isBatchProcessing = false;
@@ -2061,6 +2078,29 @@
       }
     }
 
+    function buildBatchOutputBuffer(rawSamples, pureAiSamples, gain) {
+      const len = rawSamples.length;
+      const out = new Float32Array(len);
+
+      // Auto-level quiet mic captures gently toward -12 dBFS before applying user gain
+      let aiPeak = 0;
+      for (let i = 0; i < len; i++) {
+        const a = Math.abs(pureAiSamples[i]);
+        if (a > aiPeak) aiPeak = a;
+      }
+      const autoBoost = (aiPeak > 1e-5 && aiPeak < 0.12) ? Math.min(3.5, 0.25 / aiPeak) : 1.0;
+      const totalGain = gain * autoBoost;
+
+      for (let i = 0; i < len; i++) {
+        const mixed = (pureAiSamples[i] * 0.92 + rawSamples[i] * 0.08) * totalGain;
+        let s = Math.tanh(mixed);
+        if (s > 0.98) s = 0.98;
+        if (s < -0.98) s = -0.98;
+        out[i] = s;
+      }
+      return out;
+    }
+
     function stopBatchPlayback() {
       if (batchPlayheadAnimId) {
         cancelAnimationFrame(batchPlayheadAnimId);
@@ -2181,7 +2221,6 @@
       try {
         const assets = await loadEngineAssets();
         const worker = getBatchWorker();
-        const outGain = parseFloat(batchGainSlider.value);
 
         const result = await new Promise((resolve, reject) => {
           worker.onmessage = (ev) => {
@@ -2207,15 +2246,20 @@
               dfJsCode: assets.dfJsCode,
               wasmBytes: wasmCopy,
               modelBytes: modelCopy,
-              rawSamples: rawCopy,
-              outGain
+              rawSamples: rawCopy
             },
             [wasmCopy, modelCopy, rawCopy.buffer]
           );
         });
 
         batchRawAudio = result.rawSamples;
-        batchCleanAudio = result.cleanSamples;
+        batchPureAiAudio = result.pureAiSamples;
+        batchCleanAudio = buildBatchOutputBuffer(
+          batchRawAudio,
+          batchPureAiAudio,
+          parseFloat(batchGainSlider.value)
+        );
+
         const elapsedMs = result.elapsedMs;
         const durationSec = batchRawAudio.length / SAMPLE_RATE;
         const rtFactor = (durationSec * 1000) / Math.max(1, elapsedMs);
@@ -2282,6 +2326,10 @@
 
       let capCtx = null;
       let capStream = null;
+      let capWorkletUrl = null;
+      let capNode = null;
+      let capSource = null;
+
       try {
         capCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
         const resumeP = capCtx.resume().catch(() => {});
@@ -2289,21 +2337,39 @@
         await resumeP;
         await populateDevices();
 
-        const src = capCtx.createMediaStreamSource(capStream);
-        const recorderNode = capCtx.createScriptProcessor(4096, 1, 1);
-        const muteSink = capCtx.createGain();
-        muteSink.gain.value = 0;
+        const blob = new Blob([workletSource], { type: 'application/javascript' });
+        capWorkletUrl = URL.createObjectURL(blob);
+        await capCtx.audioWorklet.addModule(capWorkletUrl);
+        URL.revokeObjectURL(capWorkletUrl);
+        capWorkletUrl = null;
+
+        if (capCtx.state === 'suspended') {
+          await capCtx.resume();
+        }
+
+        capSource = capCtx.createMediaStreamSource(capStream);
+        capNode = new AudioWorkletNode(capCtx, 'batch-capture-worklet', {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [1]
+        });
 
         const captured = new Float32Array(targetSamples);
         let collected = 0;
+        let maxInputPeak = 0;
 
         await new Promise((resolve) => {
-          recorderNode.onaudioprocess = (ev) => {
+          capNode.port.onmessage = (ev) => {
             if (!isBatchRecording) return;
-            const ch0 = ev.inputBuffer.getChannelData(0);
+            const chunk = ev.data;
             const rem = targetSamples - collected;
-            const take = Math.min(ch0.length, rem);
-            captured.set(ch0.subarray(0, take), collected);
+            const take = Math.min(chunk.length, rem);
+            for (let i = 0; i < take; i++) {
+              const s = chunk[i];
+              const a = s < 0 ? -s : s;
+              if (a > maxInputPeak) maxInputPeak = a;
+              captured[collected + i] = s;
+            }
             collected += take;
 
             const pct = Math.min(100, (collected / targetSamples) * 100);
@@ -2313,24 +2379,34 @@
 
             if (collected >= targetSamples) {
               isBatchRecording = false;
+              capNode.port.postMessage({ type: 'STOP' });
               resolve();
             }
           };
 
-          src.connect(recorderNode);
-          recorderNode.connect(muteSink);
-          muteSink.connect(capCtx.destination);
+          // Connect directly to destination (worklet outputs zeros, keeping graph active in Chromium)
+          capSource.connect(capNode);
+          capNode.connect(capCtx.destination);
         });
 
-        recorderNode.disconnect();
-        src.disconnect();
+        try { capNode.disconnect(); } catch (_) {}
+        try { capSource.disconnect(); } catch (_) {}
         capStream.getTracks().forEach(t => t.stop());
         await capCtx.close();
 
         recDot.classList.remove('recording');
         recStatusText.textContent = 'Not Recording';
+
+        if (maxInputPeak < 1e-5) {
+          addActivity('Warning: Captured microphone signal was silent (-inf dB). Check selected microphone.', 'warn');
+        } else {
+          const pkDb = (20 * Math.log10(maxInputPeak)).toFixed(1);
+          addActivity(`Captured ${durationSec}s (peak ${pkDb} dB). Running DeepFilterNet3...`);
+        }
+
         await runBatchEnhancement(captured);
       } catch (err) {
+        if (capWorkletUrl) URL.revokeObjectURL(capWorkletUrl);
         if (capStream) capStream.getTracks().forEach(t => t.stop());
         if (capCtx) { try { await capCtx.close(); } catch (_) {} }
         isBatchRecording = false;
@@ -2491,6 +2567,10 @@
     batchGainSlider.addEventListener('input', (e) => {
       const g = parseFloat(e.target.value);
       batchGainText.textContent = g.toFixed(1) + '×';
+      if (batchRawAudio && batchPureAiAudio) {
+        batchCleanAudio = buildBatchOutputBuffer(batchRawAudio, batchPureAiAudio, g);
+        renderInfernoSpectrogram(batchCleanCanvas, batchCleanAudio);
+      }
     });
 
     // Unified Keyboard Shortcuts
