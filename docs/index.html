@@ -684,7 +684,6 @@
     // 1. REAL-TIME AUDIOWORKLET WITH DEEPFILTERNET3 WEBASSEMBLY ENGINE
     // =========================================================================
     const workletSource = `
-      // Polyfill TextEncoder & TextDecoder if omitted in AudioWorkletGlobalScope
       if (typeof TextEncoder === 'undefined') {
         globalThis.TextEncoder = class {
           encode(str) {
@@ -733,7 +732,8 @@
         constructor() {
           super();
           this.hopSize = 480; // 10ms frame at 48kHz
-          this.ringCap = 4096;
+          this.ringCap = 8192;
+          this.ringMask = 8191;
 
           this.inRing = new Float32Array(this.ringCap);
           this.inRead = 0;
@@ -752,6 +752,7 @@
           this.dfMod = null;
           this.dfState = null;
           this.wasmReady = false;
+          this.stopped = false;
 
           this.ancEnabled = false;
           this.aiGain = 2.5;
@@ -769,7 +770,6 @@
                 const dfMod = createBindings();
                 dfMod.initSync(new Uint8Array(d.wasmBytes));
 
-                // Initialize DeepFilterNet3 with 28.0 dB max attenuation limit
                 const statePtr = dfMod.df_create(new Uint8Array(d.modelBytes), 28.0);
                 if (!statePtr) {
                   throw new Error('df_create returned null state pointer.');
@@ -797,33 +797,43 @@
             } else if (d.type === 'SET_BLEND') {
               this.aiBlend = d.blend;
             } else if (d.type === 'FREE_WASM') {
+              this.stopped = true;
+              this.wasmReady = false;
               if (this.dfMod && this.dfState && typeof this.dfMod.df_free === 'function') {
-                this.dfMod.df_free(this.dfState);
+                try { this.dfMod.df_free(this.dfState); } catch (_) {}
               }
               this.dfState = null;
-              this.wasmReady = false;
             }
           };
         }
 
         process(inputs, outputs) {
+          if (this.stopped) return false;
           const input = inputs[0];
           const output = outputs[0];
-          if (!input || !input[0] || !output || !output[0]) return true;
+          if (!output || !output[0]) return true;
 
-          const inCh = input[0];
           const outCh = output[0];
-          const blockLen = inCh.length;
+          const blockLen = outCh.length;
+          const inCh = (input && input[0] && input[0].length > 0) ? input[0] : null;
 
           let inPeak = 0;
-          for (let i = 0; i < blockLen; i++) {
-            const s = inCh[i];
-            const abs = s < 0 ? -s : s;
-            if (abs > inPeak) inPeak = abs;
+          if (inCh) {
+            for (let i = 0; i < blockLen; i++) {
+              const s = inCh[i];
+              const abs = s < 0 ? -s : s;
+              if (abs > inPeak) inPeak = abs;
 
-            this.inRing[this.inWrite] = s;
-            this.inWrite = (this.inWrite + 1) % this.ringCap;
-            this.inCount++;
+              this.inRing[this.inWrite] = s;
+              this.inWrite = (this.inWrite + 1) & this.ringMask;
+            }
+            this.inCount += blockLen;
+          } else {
+            for (let i = 0; i < blockLen; i++) {
+              this.inRing[this.inWrite] = 0;
+              this.inWrite = (this.inWrite + 1) & this.ringMask;
+            }
+            this.inCount += blockLen;
           }
 
           while (this.inCount >= this.hopSize) {
@@ -831,12 +841,11 @@
 
             for (let i = 0; i < this.hopSize; i++) {
               this.rawFrame[i] = this.inRing[this.inRead];
-              this.inRead = (this.inRead + 1) % this.ringCap;
+              this.inRead = (this.inRead + 1) & this.ringMask;
             }
             this.inCount -= this.hopSize;
 
             if (this.ancEnabled && this.wasmReady && this.dfState) {
-              // Run DeepFilterNet3 neural inference on 480-sample frame
               this.dfMod.df_process_frame(this.dfState, this.rawFrame, this.aiFrame);
 
               const wet = this.aiBlend;
@@ -861,15 +870,16 @@
 
             for (let i = 0; i < this.hopSize; i++) {
               this.outRing[this.outWrite] = this.cleanFrame[i];
-              this.outWrite = (this.outWrite + 1) % this.ringCap;
+              this.outWrite = (this.outWrite + 1) & this.ringMask;
             }
             this.outCount += this.hopSize;
 
-            this.port.postMessage({
-              type: 'AUDIO_HOP',
-              raw: this.rawFrame.slice(),
-              clean: this.cleanFrame.slice()
-            });
+            const rawCopy = new Float32Array(this.rawFrame);
+            const cleanCopy = new Float32Array(this.cleanFrame);
+            this.port.postMessage(
+              { type: 'AUDIO_HOP', raw: rawCopy, clean: cleanCopy },
+              [rawCopy.buffer, cleanCopy.buffer]
+            );
 
             this.timeAccumMs += (performance.now() - t0);
             this.frameCounter++;
@@ -880,7 +890,7 @@
             let sample = 0;
             if (this.outCount > 0) {
               sample = this.outRing[this.outRead];
-              this.outRead = (this.outRead + 1) % this.ringCap;
+              this.outRead = (this.outRead + 1) & this.ringMask;
               this.outCount--;
             }
             outCh[i] = sample;
@@ -922,12 +932,14 @@
 
     let cachedAssets = null;
     let audioCtx = null;
+    let sourceNode = null;
     let workletNode = null;
     let analyserNode = null;
     let monitorGainNode = null;
     let mediaStream = null;
 
     let isRunning = false;
+    let isStarting = false;
     let wasmLoaded = false;
     let ancEnabled = false;
     let isRecordingLive = false;
@@ -967,7 +979,7 @@
     const consoleBox = document.getElementById('consoleBox');
 
     const canvas = document.getElementById('dspCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
 
     function addActivity(msg, tone = '') {
       const now = new Date().toLocaleTimeString('en-US', {
@@ -980,6 +992,9 @@
       row.className = `log-entry ${tone}`;
       row.innerHTML = `<span class="log-time">${now}</span><span class="log-msg">${msg}</span>`;
       consoleBox.appendChild(row);
+      while (consoleBox.children.length > 60) {
+        consoleBox.removeChild(consoleBox.firstChild);
+      }
       consoleBox.scrollTop = consoleBox.scrollHeight;
     }
 
@@ -1010,30 +1025,83 @@
     }
 
     // =========================================================================
-    // 4. HARDWARE DEVICES & WAV FILE EXPORT
+    // 4. HARDWARE DEVICES & HOT-SWAPPING
     // =========================================================================
+    function buildMicConstraints(deviceId) {
+      const audioConstraints = {
+        channelCount: { ideal: 1 },
+        sampleRate: { ideal: SAMPLE_RATE },
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false
+      };
+      if (deviceId) {
+        audioConstraints.deviceId = { exact: deviceId };
+      }
+      return { audio: audioConstraints };
+    }
+
     async function populateDevices() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const inputs = devices.filter(d => d.kind === 'audioinput');
         const outputs = devices.filter(d => d.kind === 'audiooutput');
 
+        const activeMicTrack = mediaStream && mediaStream.getAudioTracks()[0];
+        const activeMicId = (activeMicTrack && activeMicTrack.getSettings().deviceId) || inputSelect.value;
+
         if (inputs.length > 0) {
-          const prevIn = inputSelect.value;
-          inputSelect.innerHTML = inputs.map((d, i) =>
-            `<option value="${d.deviceId}">${d.label || 'Microphone ' + (i + 1)}</option>`
-          ).join('');
-          if (prevIn) inputSelect.value = prevIn;
+          const prevIn = inputSelect.value || activeMicId || '';
+          inputSelect.innerHTML =
+            `<option value="">System Default Microphone</option>` +
+            inputs
+              .filter(d => d.deviceId && d.deviceId !== 'default')
+              .map((d, i) => `<option value="${d.deviceId}">${d.label || 'Microphone ' + (i + 1)}</option>`)
+              .join('');
+          if (prevIn && Array.from(inputSelect.options).some(o => o.value === prevIn)) {
+            inputSelect.value = prevIn;
+          }
         }
+
         if (outputs.length > 0) {
-          const prevOut = outputSelect.value;
-          outputSelect.innerHTML = outputs.map((d, i) =>
-            `<option value="${d.deviceId}">${d.label || 'Output ' + (i + 1)}</option>`
-          ).join('');
-          if (prevOut) outputSelect.value = prevOut;
+          const prevOut = outputSelect.value || '';
+          outputSelect.innerHTML =
+            `<option value="">System Default Output</option>` +
+            outputs
+              .filter(d => d.deviceId && d.deviceId !== 'default')
+              .map((d, i) => `<option value="${d.deviceId}">${d.label || 'Output ' + (i + 1)}</option>`)
+              .join('');
+          if (prevOut && Array.from(outputSelect.options).some(o => o.value === prevOut)) {
+            outputSelect.value = prevOut;
+          }
         }
-      } catch (e) {
-        // Permissions granted on start
+      } catch (_) {}
+    }
+
+    async function switchInputDevice() {
+      if (!isRunning || !audioCtx || !workletNode) return;
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia(buildMicConstraints(inputSelect.value));
+        const newSource = audioCtx.createMediaStreamSource(newStream);
+
+        if (sourceNode) {
+          try { sourceNode.disconnect(); } catch (_) {}
+        }
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(t => t.stop());
+        }
+
+        mediaStream = newStream;
+        sourceNode = newSource;
+        sourceNode.connect(workletNode);
+
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
+        addActivity('Switched microphone input.', 'good');
+      } catch (err) {
+        addActivity(`Microphone switch failed: ${err.message}`, 'warn');
       }
     }
 
@@ -1076,7 +1144,7 @@
     }
 
     function playCueBeep(freq, duration = 0.065) {
-      if (!audioCtx) return;
+      if (!audioCtx || audioCtx.state !== 'running') return;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.frequency.value = freq;
@@ -1089,73 +1157,85 @@
     }
 
     // =========================================================================
-    // 5. STUDIO VISUALIZER
+    // 5. HIGH-SPEED STUDIO VISUALIZER (IMAGEDATA BUFFERED)
     // =========================================================================
     function startVisualizer() {
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+
       const freqBins = new Uint8Array(analyserNode.frequencyBinCount);
       const timeDomain = new Uint8Array(analyserNode.fftSize);
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = canvas.width;
-      tempCanvas.height = canvas.height;
-      const tempCtx = tempCanvas.getContext('2d');
+      const h = canvas.height;
+      const w = canvas.width;
+      const specColImage = ctx.createImageData(2, h);
+      const colPixels = specColImage.data;
+
+      ctx.fillStyle = '#070709';
+      ctx.fillRect(0, 0, w, h);
 
       function render() {
-        if (!isRunning) return;
+        if (!isRunning || !analyserNode) return;
         animFrameId = requestAnimationFrame(render);
 
         if (visMode === 'spec') {
           analyserNode.getByteFrequencyData(freqBins);
-          tempCtx.drawImage(canvas, 0, 0);
-          ctx.drawImage(tempCanvas, -2, 0);
+          ctx.drawImage(canvas, -2, 0);
 
-          const h = canvas.height;
           const usableBins = Math.floor(freqBins.length * 0.65);
 
           for (let y = 0; y < h; y++) {
-            const binIdx = Math.floor(((h - 1 - y) / h) * usableBins);
+            const binIdx = (((h - 1 - y) * usableBins) / h) | 0;
             const ratio = freqBins[binIdx] / 255;
 
             let r = 7, g = 7, b = 9;
             if (ratio > 0.04) {
               if (ancEnabled) {
-                r = Math.floor(30 + 215 * Math.pow(ratio, 2.2));
-                g = Math.floor(90 + 165 * Math.pow(ratio, 0.9));
-                b = Math.floor(140 + 115 * Math.pow(ratio, 1.1));
+                r = (30 + 215 * Math.pow(ratio, 2.2)) | 0;
+                g = (90 + 165 * Math.pow(ratio, 0.9)) | 0;
+                b = (140 + 115 * Math.pow(ratio, 1.1)) | 0;
               } else {
-                r = Math.floor(60 + 195 * Math.pow(ratio, 1.0));
-                g = Math.floor(65 + 145 * Math.pow(ratio, 1.3));
-                b = Math.floor(85 + 90 * Math.pow(ratio, 1.8));
+                r = (60 + 195 * ratio) | 0;
+                g = (65 + 145 * Math.pow(ratio, 1.3)) | 0;
+                b = (85 + 90 * Math.pow(ratio, 1.8)) | 0;
               }
             }
-            ctx.fillStyle = `rgb(${r},${g},${b})`;
-            ctx.fillRect(canvas.width - 2, y, 2, 1);
+
+            const p0 = y * 8;
+            colPixels[p0]     = r;
+            colPixels[p0 + 1] = g;
+            colPixels[p0 + 2] = b;
+            colPixels[p0 + 3] = 255;
+            colPixels[p0 + 4] = r;
+            colPixels[p0 + 5] = g;
+            colPixels[p0 + 6] = b;
+            colPixels[p0 + 7] = 255;
           }
+          ctx.putImageData(specColImage, w - 2, 0);
         } else {
           analyserNode.getByteTimeDomainData(timeDomain);
           ctx.fillStyle = '#070709';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillRect(0, 0, w, h);
 
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
           ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(0, canvas.height / 2);
-          ctx.lineTo(canvas.width, canvas.height / 2);
+          ctx.moveTo(0, h / 2);
+          ctx.lineTo(w, h / 2);
           ctx.stroke();
 
           ctx.lineWidth = 2;
           ctx.strokeStyle = ancEnabled ? '#30d158' : '#e5e5ea';
           ctx.beginPath();
 
-          const sliceWidth = canvas.width / timeDomain.length;
+          const sliceWidth = w / timeDomain.length;
           let x = 0;
           for (let i = 0; i < timeDomain.length; i++) {
             const v = timeDomain[i] / 128.0;
-            const y = (v * canvas.height) / 2;
+            const y = (v * h) / 2;
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
             x += sliceWidth;
           }
-          ctx.lineTo(canvas.width, canvas.height / 2);
+          ctx.lineTo(w, h / 2);
           ctx.stroke();
         }
       }
@@ -1166,39 +1246,46 @@
     // 6. STREAM LIFECYCLE & CONTROLS
     // =========================================================================
     async function startStream() {
+      if (isRunning || isStarting) return;
+      isStarting = true;
       startBtn.disabled = true;
       streamDot.className = 'dot loading';
       engineStatus.textContent = 'Loading Model...';
       addActivity('Loading DeepFilterNet3 WebAssembly engine...');
 
+      let workletUrl = null;
       try {
-        const assets = await loadEngineAssets();
+        // 1. Create and unlock AudioContext immediately while user click gesture is active
+        audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE, latencyHint: 'interactive' });
+        const initialResumePromise = audioCtx.resume().catch(() => {});
 
-        const audioConstraints = {
-          channelCount: 1,
-          sampleRate: SAMPLE_RATE,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
-        };
-        if (inputSelect.value) {
-          audioConstraints.deviceId = { exact: inputSelect.value };
-        }
+        // 2. Request microphone access & download WASM/model assets in parallel
+        const [stream, assets] = await Promise.all([
+          navigator.mediaDevices.getUserMedia(buildMicConstraints(inputSelect.value)),
+          loadEngineAssets(),
+          initialResumePromise
+        ]);
 
-        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+        mediaStream = stream;
         await populateDevices();
 
-        audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE, latencyHint: 'interactive' });
         if (outputSelect.value && typeof audioCtx.setSinkId === 'function') {
-          await audioCtx.setSinkId(outputSelect.value);
+          try { await audioCtx.setSinkId(outputSelect.value); } catch (_) {}
         }
 
         const blob = new Blob([workletSource], { type: 'application/javascript' });
-        const workletUrl = URL.createObjectURL(blob);
+        workletUrl = URL.createObjectURL(blob);
         await audioCtx.audioWorklet.addModule(workletUrl);
+        URL.revokeObjectURL(workletUrl);
+        workletUrl = null;
 
-        const source = audioCtx.createMediaStreamSource(mediaStream);
-        workletNode = new AudioWorkletNode(audioCtx, 'deepfilter-worklet');
+        sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+        workletNode = new AudioWorkletNode(audioCtx, 'deepfilter-worklet', {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [1]
+        });
+
         analyserNode = audioCtx.createAnalyser();
         analyserNode.fftSize = 1024;
         analyserNode.smoothingTimeConstant = 0.68;
@@ -1206,11 +1293,14 @@
         monitorGainNode = audioCtx.createGain();
         monitorGainNode.gain.value = monitorMuted ? 0.0 : 1.0;
 
-        workletNode.port.onmessage = (e) => {
+        workletNode.port.onmessage = async (e) => {
           const d = e.data;
           if (d.type === 'WASM_READY') {
             wasmLoaded = true;
             toggleAncBtn.disabled = false;
+            if (audioCtx && audioCtx.state === 'suspended') {
+              try { await audioCtx.resume(); } catch (_) {}
+            }
             streamDot.className = 'dot live';
             engineStatus.textContent = `Live · ${audioCtx.sampleRate / 1000} kHz`;
             addActivity(`DeepFilterNet3 ready (${d.hopSize}-sample frames).`, 'good');
@@ -1223,10 +1313,18 @@
             const cleanHop = d.clean;
             const len = rawHop.length;
 
-            for (let i = 0; i < len; i++) {
-              rawHistoryBuf[historyWriteIdx] = rawHop[i];
-              cleanHistoryBuf[historyWriteIdx] = cleanHop[i];
-              historyWriteIdx = (historyWriteIdx + 1) % HISTORY_SAMPLES;
+            const spaceToEnd = HISTORY_SAMPLES - historyWriteIdx;
+            if (len <= spaceToEnd) {
+              rawHistoryBuf.set(rawHop, historyWriteIdx);
+              cleanHistoryBuf.set(cleanHop, historyWriteIdx);
+              historyWriteIdx = (historyWriteIdx + len) % HISTORY_SAMPLES;
+            } else {
+              rawHistoryBuf.set(rawHop.subarray(0, spaceToEnd), historyWriteIdx);
+              cleanHistoryBuf.set(cleanHop.subarray(0, spaceToEnd), historyWriteIdx);
+              const rem = len - spaceToEnd;
+              rawHistoryBuf.set(rawHop.subarray(spaceToEnd), 0);
+              cleanHistoryBuf.set(cleanHop.subarray(spaceToEnd), 0);
+              historyWriteIdx = rem;
             }
 
             if (isRecordingLive) {
@@ -1251,24 +1349,33 @@
           }
         };
 
-        // Pass cloned ArrayBuffers so cachedAssets remains reusable on restart
-        workletNode.port.postMessage({
-          type: 'INIT_WASM',
-          dfJsCode: assets.dfJsCode,
-          wasmBytes: assets.wasmBytes.slice(0),
-          modelBytes: assets.modelBytes.slice(0)
-        });
-
-        // Sync current slider values with worklet
-        workletNode.port.postMessage({ type: 'SET_GAIN', gain: parseFloat(gainSlider.value) });
-        workletNode.port.postMessage({ type: 'SET_BLEND', blend: parseInt(blendSlider.value, 10) / 100 });
-
-        source.connect(workletNode);
+        sourceNode.connect(workletNode);
         workletNode.connect(analyserNode);
         analyserNode.connect(monitorGainNode);
         monitorGainNode.connect(audioCtx.destination);
 
+        // Ensure AudioContext is running before initializing WASM
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
+
+        const wasmCopy = assets.wasmBytes.slice(0);
+        const modelCopy = assets.modelBytes.slice(0);
+        workletNode.port.postMessage(
+          {
+            type: 'INIT_WASM',
+            dfJsCode: assets.dfJsCode,
+            wasmBytes: wasmCopy,
+            modelBytes: modelCopy
+          },
+          [wasmCopy, modelCopy]
+        );
+
+        workletNode.port.postMessage({ type: 'SET_GAIN', gain: parseFloat(gainSlider.value) });
+        workletNode.port.postMessage({ type: 'SET_BLEND', blend: parseInt(blendSlider.value, 10) / 100 });
+
         isRunning = true;
+        isStarting = false;
         startBtn.disabled = false;
         startBtn.classList.add('active');
         startBtnText.textContent = 'Stop Audio';
@@ -1278,6 +1385,17 @@
 
         startVisualizer();
       } catch (err) {
+        if (workletUrl) URL.revokeObjectURL(workletUrl);
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(t => t.stop());
+          mediaStream = null;
+        }
+        if (audioCtx) {
+          try { await audioCtx.close(); } catch (_) {}
+          audioCtx = null;
+        }
+        isStarting = false;
+        isRunning = false;
         startBtn.disabled = false;
         streamDot.className = 'dot';
         engineStatus.textContent = 'Ready';
@@ -1289,14 +1407,45 @@
       }
     }
 
-    function stopStream() {
+    async function stopStream() {
+      if (!isRunning && !isStarting) return;
       if (isRecordingLive) toggleLiveRecording();
-      if (animFrameId) cancelAnimationFrame(animFrameId);
-      if (workletNode) workletNode.port.postMessage({ type: 'FREE_WASM' });
-      if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
-      if (audioCtx) audioCtx.close();
+      if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+
+      if (workletNode) {
+        try {
+          workletNode.port.postMessage({ type: 'FREE_WASM' });
+          workletNode.port.onmessage = null;
+          workletNode.disconnect();
+        } catch (_) {}
+        workletNode = null;
+      }
+      if (sourceNode) {
+        try { sourceNode.disconnect(); } catch (_) {}
+        sourceNode = null;
+      }
+      if (analyserNode) {
+        try { analyserNode.disconnect(); } catch (_) {}
+        analyserNode = null;
+      }
+      if (monitorGainNode) {
+        try { monitorGainNode.disconnect(); } catch (_) {}
+        monitorGainNode = null;
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+      if (audioCtx) {
+        try { await audioCtx.close(); } catch (_) {}
+        audioCtx = null;
+      }
 
       isRunning = false;
+      isStarting = false;
       wasmLoaded = false;
       ancEnabled = false;
       streamDot.className = 'dot';
@@ -1313,6 +1462,8 @@
       ancBadge.className = 'mode-status off';
       inBar.style.width = '0%';
       outBar.style.width = '0%';
+      inDbText.textContent = '-inf dB';
+      outDbText.textContent = '-inf dB';
       latencyVal.textContent = '0.0 ms';
       attenVal.textContent = '0.0 dB';
 
@@ -1321,6 +1472,9 @@
 
     function toggleAnc() {
       if (!isRunning || !wasmLoaded || !workletNode) return;
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
       ancEnabled = !ancEnabled;
       workletNode.port.postMessage({ type: 'SET_ANC', enabled: ancEnabled });
       playCueBeep(ancEnabled ? 880 : 350);
@@ -1367,6 +1521,8 @@
           cleanMerged.set(liveCleanChunks[i], offset);
           offset += liveRawChunks[i].length;
         }
+        liveRawChunks = [];
+        liveCleanChunks = [];
 
         triggerDownload(encodeWavFile(rawMerged, SAMPLE_RATE), 'captured_raw.wav');
         triggerDownload(encodeWavFile(cleanMerged, SAMPLE_RATE), 'captured_cleaned.wav');
@@ -1408,6 +1564,23 @@
     exportBufBtn.addEventListener('click', exportRollingBuffer);
     muteMonitorBtn.addEventListener('click', toggleMonitorMute);
 
+    inputSelect.addEventListener('change', switchInputDevice);
+
+    outputSelect.addEventListener('change', async () => {
+      if (audioCtx && typeof audioCtx.setSinkId === 'function') {
+        try {
+          await audioCtx.setSinkId(outputSelect.value);
+          addActivity('Switched output device.', 'good');
+        } catch (err) {
+          addActivity(`Output switch failed: ${err.message}`, 'warn');
+        }
+      }
+    });
+
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', populateDevices);
+    }
+
     gainSlider.addEventListener('input', (e) => {
       const g = parseFloat(e.target.value);
       gainValText.textContent = g.toFixed(1) + '×';
@@ -1418,13 +1591,6 @@
       const pct = parseInt(e.target.value, 10);
       blendValText.textContent = `${pct}% Filtered · ${100 - pct}% Natural`;
       if (workletNode) workletNode.port.postMessage({ type: 'SET_BLEND', blend: pct / 100 });
-    });
-
-    outputSelect.addEventListener('change', async () => {
-      if (audioCtx && outputSelect.value && typeof audioCtx.setSinkId === 'function') {
-        await audioCtx.setSinkId(outputSelect.value);
-        addActivity('Switched output device.');
-      }
     });
 
     document.getElementById('tabSpec').addEventListener('click', (e) => {
@@ -1440,7 +1606,11 @@
     });
 
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'Enter' && !isRunning) {
+      if (e.repeat) return;
+      const tag = document.activeElement ? document.activeElement.tagName : '';
+      if (tag === 'SELECT' || tag === 'INPUT') return;
+
+      if (e.code === 'Enter' && !isRunning && !isStarting) {
         e.preventDefault();
         startStream();
         return;
@@ -1450,10 +1620,13 @@
         e.preventDefault();
         toggleAnc();
       } else if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
         toggleLiveRecording();
       } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
         exportRollingBuffer();
       } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
         toggleMonitorMute();
       }
     });
