@@ -33,12 +33,12 @@ except Exception:
 
 # ----------------- GLOBAL CONFIGURATION -----------------
 SAMPLE_RATE = 48000
-BLOCK_SIZE = 960           # 20ms buffer
+BLOCK_SIZE = 960           # 20ms frame buffer at 48kHz
 BUFFER_CONTEXT_LEN = 2880  # 60ms rolling context
 RAW_GAIN = 1.0
-AI_GAIN = 2.5       
+AI_GAIN = 2.5
 AI_CEILING = 0.98
-DURATION = 5        
+DURATION = 5
 HISTORY_TOTAL_SAMPLES = 10 * SAMPLE_RATE
 
 ui_queue = queue.Queue(maxsize=5)
@@ -46,7 +46,7 @@ disk_rec_queue = queue.Queue(maxsize=500)
 
 # ----------------- FAST PRE-ALLOCATED AUDIO RING BUFFER -
 class AudioBlockRing:
-    """Zero-allocation lock-free ring buffer for passing blocks between callbacks."""
+    """Pre-allocated ring buffer for passing fixed-size audio blocks between threads."""
     def __init__(self, capacity=4, block_len=BLOCK_SIZE):
         self.buffer = np.zeros((capacity, block_len), dtype=np.float32)
         self.capacity = capacity
@@ -76,17 +76,17 @@ class AudioBlockRing:
 # ----------------- DEVICE SELECTION HELPER --------------
 def configure_devices():
     devices = sd.query_devices()
-    
+
     print("\n" + Fore.CYAN + "=" * 65)
     print(Fore.WHITE + Style.BRIGHT + "  AVAILABLE AUDIO HARDWARE ON THIS SYSTEM")
     print(Fore.CYAN + "=" * 65)
-    
+
     inputs, outputs = [], []
     for idx, dev in enumerate(devices):
         max_in = dev.get('max_input_channels', 0)
         max_out = dev.get('max_output_channels', 0)
         api_name = sd.query_hostapis(dev['hostapi'])['name']
-        
+
         if max_in > 0:
             inputs.append((idx, dev['name'], api_name, max_in))
         if max_out > 0:
@@ -99,9 +99,9 @@ def configure_devices():
     print(Fore.YELLOW + "\n--- OUTPUT DEVICES (3.5mm / Speakers) ---")
     for idx, name, api, ch in outputs:
         print(f"  [{idx:2d}] {name} ({api}, {ch} out)")
-    
+
     print(Fore.CYAN + "=" * 65)
-    
+
     while True:
         try:
             in_choice = input(Fore.WHITE + "Enter INPUT device index: ").strip()
@@ -122,8 +122,8 @@ def configure_devices():
         except ValueError:
             print(Fore.RED + "Numeric index required.")
 
-    mic_info = sd.query_devices(in_idx)
-    in_channels = min(2, mic_info['max_input_channels'])
+    # Default to mono (1 ch) to avoid halving signal gain on stereo interfaces with 1 mic
+    in_channels = 1
     sd.default.device = (in_idx, out_idx)
     print(Fore.GREEN + f"\n[ROUTING OK] Mic ID: {in_idx} ({in_channels} ch) -> Output ID: {out_idx} (2 ch)\n")
     return in_idx, out_idx, in_channels
@@ -151,6 +151,7 @@ clean_record_buf = np.zeros(BLOCK_SIZE, dtype=np.float32)
 raw_history_buf = np.zeros(HISTORY_TOTAL_SAMPLES, dtype=np.float32)
 clean_history_buf = np.zeros(HISTORY_TOTAL_SAMPLES, dtype=np.float32)
 history_write_idx = 0
+history_lock = threading.Lock()
 
 # ----------------- ASYNC DISK RECORDER WORKER -----------
 def disk_writer_worker():
@@ -166,11 +167,17 @@ def disk_writer_worker():
             clean_writer = sf.SoundFile(clean_path, mode='w', samplerate=SAMPLE_RATE, channels=1)
         elif cmd == "WRITE":
             raw_blk, clean_blk = payload
-            if raw_writer: raw_writer.write(raw_blk)
-            if clean_writer: clean_writer.write(clean_blk)
+            if raw_writer:
+                raw_writer.write(raw_blk)
+            if clean_writer:
+                clean_writer.write(clean_blk)
         elif cmd == "STOP":
-            if raw_writer: raw_writer.close(); raw_writer = None
-            if clean_writer: clean_writer.close(); clean_writer = None
+            if raw_writer:
+                raw_writer.close()
+                raw_writer = None
+            if clean_writer:
+                clean_writer.close()
+                clean_writer = None
         disk_rec_queue.task_done()
 
 threading.Thread(target=disk_writer_worker, daemon=True).start()
@@ -189,17 +196,16 @@ BEEP_AI_OFF = make_beep(350, 0.09)
 BEEP_REC_START = make_beep(1200, 0.08)
 BEEP_REC_STOP = make_beep(600, 0.08)
 cue_buffer = np.array([], dtype=np.float32)
+cue_lock = threading.Lock()
 
 def trigger_cue(beep_arr):
     global cue_buffer
-    cue_buffer = beep_arr.copy()
+    with cue_lock:
+        cue_buffer = beep_arr.copy()
 
 # ----------------- STREAM RUNTIME STATE -----------------
 anc_enabled = False
 is_recording_live = False
-
-frame_count = 0
-latency_accumulator = 0.0
 
 def get_next_capture_index():
     idx = 1
@@ -229,9 +235,10 @@ def toggle_live_recording():
         print(Fore.GREEN + "\n[LIVE REC STOPPED] Files flushed and finalized.")
 
 def save_buffer_recording():
-    # Instantaneous unrolling of circular history buffer
-    raw_audio = np.concatenate([raw_history_buf[history_write_idx:], raw_history_buf[:history_write_idx]])
-    clean_audio = np.concatenate([clean_history_buf[history_write_idx:], clean_history_buf[:history_write_idx]])
+    with history_lock:
+        idx = history_write_idx
+        raw_audio = np.concatenate([raw_history_buf[idx:], raw_history_buf[:idx]])
+        clean_audio = np.concatenate([clean_history_buf[idx:], clean_history_buf[:idx]])
     sf.write("demo_raw.wav", raw_audio, SAMPLE_RATE)
     sf.write("demo_cleaned.wav", clean_audio, SAMPLE_RATE)
     print(Fore.YELLOW + "\n[BUFFER EXPORT] Saved rolling 10s buffer to 'demo_raw.wav' & 'demo_cleaned.wav'")
@@ -240,100 +247,112 @@ def save_buffer_recording():
 def run_live_stream():
     global is_recording_live, history_write_idx
     print(Fore.CYAN + "\n[WARMUP] Binding low-latency audio hardware streams...")
-    
-    io_ring = AudioBlockRing(capacity=4, block_len=BLOCK_SIZE)
+
+    in_ring = AudioBlockRing(capacity=4, block_len=BLOCK_SIZE)
+    out_ring = AudioBlockRing(capacity=4, block_len=BLOCK_SIZE)
     in_transfer_buf = np.zeros(BLOCK_SIZE, dtype=np.float32)
+    hw_out_buf = np.zeros(BLOCK_SIZE, dtype=np.float32)
+    stop_event = threading.Event()
+
+    def inference_worker():
+        global history_write_idx
+        frame_count = 0
+        latency_accumulator = 0.0
+
+        while not stop_event.is_set():
+            if not in_ring.read(raw_scratch):
+                time.sleep(0.001)
+                continue
+
+            t_start = time.perf_counter()
+
+            # In-place shift of context buffer
+            rolling_raw_buffer[:-BLOCK_SIZE] = rolling_raw_buffer[BLOCK_SIZE:]
+            rolling_raw_buffer[-BLOCK_SIZE:] = raw_scratch
+
+            # Inference branch (decoupled from PortAudio hardware callback)
+            if anc_enabled or is_recording_live:
+                with torch.inference_mode():
+                    cleaned_tensor = enhance(model, df_state, rolling_tensor, pad=False)
+
+                ai_scratch[:] = cleaned_tensor[0, -BLOCK_SIZE:].cpu().numpy()
+
+                np.multiply(ai_scratch, AI_GAIN, out=clean_record_buf)
+                np.tanh(clean_record_buf, out=clean_record_buf)
+                np.clip(clean_record_buf, -AI_CEILING, AI_CEILING, out=clean_record_buf)
+
+                if anc_enabled:
+                    # 90% AI speech + 10% passthrough blend in-place
+                    np.multiply(ai_scratch, 0.90, out=proc_audio_buf)
+                    proc_audio_buf[:] += raw_scratch * 0.10
+                    proc_audio_buf[:] *= AI_GAIN
+                    np.tanh(proc_audio_buf, out=proc_audio_buf)
+                    np.clip(proc_audio_buf, -AI_CEILING, AI_CEILING, out=proc_audio_buf)
+                else:
+                    np.multiply(raw_scratch, RAW_GAIN, out=proc_audio_buf)
+                    np.clip(proc_audio_buf, -AI_CEILING, AI_CEILING, out=proc_audio_buf)
+            else:
+                # 100% Zero-Inference bypass
+                np.multiply(raw_scratch, RAW_GAIN, out=proc_audio_buf)
+                np.clip(proc_audio_buf, -AI_CEILING, AI_CEILING, out=proc_audio_buf)
+                clean_record_buf[:] = proc_audio_buf
+
+            # Push processed block to playback ring immediately
+            out_ring.write(proc_audio_buf)
+
+            # Update rolling 10s history safely
+            with history_lock:
+                raw_history_buf[history_write_idx:history_write_idx + BLOCK_SIZE] = raw_scratch
+                clean_history_buf[history_write_idx:history_write_idx + BLOCK_SIZE] = proc_audio_buf
+                history_write_idx = (history_write_idx + BLOCK_SIZE) % HISTORY_TOTAL_SAMPLES
+
+            if is_recording_live:
+                try:
+                    disk_rec_queue.put_nowait(("WRITE", (raw_scratch.copy(), clean_record_buf.copy())))
+                except queue.Full:
+                    pass
+
+            t_end = time.perf_counter()
+            latency_accumulator += (t_end - t_start) * 1000.0
+            frame_count += 1
+
+            if frame_count % 10 == 0:
+                avg_ms = latency_accumulator / 10.0
+                in_pk = float(np.max(np.abs(raw_scratch)))
+                out_pk = float(np.max(np.abs(proc_audio_buf)))
+
+                try:
+                    ui_queue.put_nowait((anc_enabled, in_pk, out_pk, avg_ms, is_recording_live))
+                except queue.Full:
+                    pass
+                latency_accumulator = 0.0
 
     def input_callback(indata, frames, time_info, status):
         if indata.shape[1] > 1:
-            # Fast mono downmix without extra allocation
-            np.add(indata[:, 0], indata[:, 1], out=in_transfer_buf)
-            in_transfer_buf[:] *= 0.5
+            in_transfer_buf[:] = indata[:, 0]
         else:
             in_transfer_buf[:] = indata[:, 0]
-        
-        io_ring.write(in_transfer_buf)
+        in_ring.write(in_transfer_buf)
 
     def output_callback(outdata, frames, time_info, status):
-        global frame_count, latency_accumulator, cue_buffer, history_write_idx
-
-        t_start = time.perf_counter()
-
-        if not io_ring.read(raw_scratch):
+        global cue_buffer
+        if not out_ring.read(hw_out_buf):
             outdata.fill(0)
             return
 
-        # Write to rolling history without allocations
-        raw_history_buf[history_write_idx:history_write_idx + BLOCK_SIZE] = raw_scratch
+        # Mix audio cue if active
+        with cue_lock:
+            if len(cue_buffer) > 0:
+                chunk_len = min(BLOCK_SIZE, len(cue_buffer))
+                hw_out_buf[:chunk_len] += cue_buffer[:chunk_len]
+                cue_buffer = cue_buffer[chunk_len:]
 
-        # In-place shift of context buffer
-        rolling_raw_buffer[:-BLOCK_SIZE] = rolling_raw_buffer[BLOCK_SIZE:]
-        rolling_raw_buffer[-BLOCK_SIZE:] = raw_scratch
-
-        # Inference branch
-        if anc_enabled or is_recording_live:
-            with torch.inference_mode():
-                cleaned_tensor = enhance(model, df_state, rolling_tensor, pad=False)
-
-            # Direct slice view into PyTorch tensor output
-            ai_scratch[:] = cleaned_tensor[0, -BLOCK_SIZE:].cpu().numpy()
-            
-            # In-place clean signal formulation
-            np.multiply(ai_scratch, AI_GAIN, out=clean_record_buf)
-            np.tanh(clean_record_buf, out=clean_record_buf)
-            np.clip(clean_record_buf, -AI_CEILING, AI_CEILING, out=clean_record_buf)
-
-            if anc_enabled:
-                # 90% AI speech + 10% passthrough blend in-place
-                np.multiply(ai_scratch, 0.90, out=proc_audio_buf)
-                proc_audio_buf[:] += raw_scratch * 0.10
-                proc_audio_buf[:] *= AI_GAIN
-                np.tanh(proc_audio_buf, out=proc_audio_buf)
-                np.clip(proc_audio_buf, -AI_CEILING, AI_CEILING, out=proc_audio_buf)
-            else:
-                np.multiply(raw_scratch, RAW_GAIN, out=proc_audio_buf)
-                np.clip(proc_audio_buf, -AI_CEILING, AI_CEILING, out=proc_audio_buf)
-        else:
-            # 100% Zero-Inference bypass
-            np.multiply(raw_scratch, RAW_GAIN, out=proc_audio_buf)
-            np.clip(proc_audio_buf, -AI_CEILING, AI_CEILING, out=proc_audio_buf)
-            clean_record_buf[:] = proc_audio_buf
-
-        # Store clean audio in rolling history
-        clean_history_buf[history_write_idx:history_write_idx + BLOCK_SIZE] = proc_audio_buf
-        history_write_idx = (history_write_idx + BLOCK_SIZE) % HISTORY_TOTAL_SAMPLES
-
-        if is_recording_live:
-            try:
-                disk_rec_queue.put_nowait(("WRITE", (raw_scratch.copy(), clean_record_buf.copy())))
-            except queue.Full:
-                pass
-
-        # Audio cue injection
-        if len(cue_buffer) > 0:
-            chunk_len = min(BLOCK_SIZE, len(cue_buffer))
-            proc_audio_buf[:chunk_len] += cue_buffer[:chunk_len]
-            cue_buffer = cue_buffer[chunk_len:]
-
-        # Stereo hardware copy
-        outdata[:, 0] = proc_audio_buf
+        outdata[:, 0] = hw_out_buf
         if outdata.shape[1] > 1:
-            outdata[:, 1] = proc_audio_buf
+            outdata[:, 1] = hw_out_buf
 
-        t_end = time.perf_counter()
-        latency_accumulator += (t_end - t_start) * 1000.0
-        frame_count += 1
-
-        if frame_count % 10 == 0:
-            avg_ms = latency_accumulator / 10.0
-            in_pk = float(np.max(np.abs(raw_scratch)))
-            out_pk = float(np.max(np.abs(proc_audio_buf)))
-
-            try:
-                ui_queue.put_nowait((anc_enabled, in_pk, out_pk, avg_ms, is_recording_live))
-            except queue.Full:
-                pass
-            latency_accumulator = 0.0
+    worker_thread = threading.Thread(target=inference_worker, daemon=True)
+    worker_thread.start()
 
     in_stream = sd.InputStream(
         device=INPUT_DEVICE_ID,
@@ -343,7 +362,7 @@ def run_live_stream():
         latency='low',
         callback=input_callback
     )
-    
+
     out_stream = sd.OutputStream(
         device=OUTPUT_DEVICE_ID,
         channels=2,
@@ -354,49 +373,58 @@ def run_live_stream():
     )
 
     print("\n" + Fore.GREEN + "=" * 78)
-    print(Fore.WHITE + Style.BRIGHT + "  NOISEFILTER_AI ULTRA-LOW LATENCY MONITOR (<10ms TARGET)")
+    print(Fore.WHITE + Style.BRIGHT + "  NOISEFILTER_AI LOW-LATENCY MONITOR (<20ms FRAME BUDGET)")
     print(Fore.WHITE + "  [SPACE] Toggle AI/RAW  |  [A] Toggle Live Dual-Audio Recording")
     print(Fore.WHITE + "  [R] Export Last 10s    |  [Q/ESC] Return to Menu")
     print(Fore.GREEN + "=" * 78 + "\n")
 
-    with in_stream, out_stream:
-        while True:
-            try:
-                enabled, in_pk, out_pk, avg_ms, rec_active = ui_queue.get_nowait()
-                reduction_db = max(0.0, 20.0 * np.log10((in_pk + 1e-5) / (out_pk + 1e-5))) if in_pk > 1e-4 and out_pk > 1e-4 else 0.0
-                budget_str = Fore.GREEN + f"{avg_ms:4.1f}ms [PASS]" if avg_ms < 20.0 else Fore.RED + f"{avg_ms:4.1f}ms [FAIL]"
-                mode_str = Fore.GREEN + "[NOISEFILTER_AI ON]" if enabled else Fore.YELLOW + "[NOISEFILTER_AI OFF]"
-                rec_str = Fore.RED + "[● REC]" if rec_active else Fore.WHITE + "[IDLE]"
-                
-                # Render VU bars
-                raw_bar = "|" * int(min(1.0, in_pk * 3.5) * 10)
-                out_bar = "|" * int(min(1.0, out_pk * 3.5) * 10)
-                raw_bar += " " * (10 - len(raw_bar))
-                out_bar += " " * (10 - len(out_bar))
+    try:
+        with in_stream, out_stream:
+            while True:
+                try:
+                    enabled, in_pk, out_pk, avg_ms, rec_active = ui_queue.get_nowait()
+                    reduction_db = (
+                        max(0.0, 20.0 * np.log10((in_pk + 1e-5) / (out_pk + 1e-5)))
+                        if in_pk > 1e-4 and out_pk > 1e-4 else 0.0
+                    )
+                    budget_str = (
+                        Fore.GREEN + f"{avg_ms:4.1f}ms [PASS]"
+                        if avg_ms < 20.0 else Fore.RED + f"{avg_ms:4.1f}ms [FAIL]"
+                    )
+                    mode_str = Fore.GREEN + "[NOISEFILTER_AI ON]" if enabled else Fore.YELLOW + "[NOISEFILTER_AI OFF]"
+                    rec_str = Fore.RED + "[● REC]" if rec_active else Fore.WHITE + "[IDLE]"
 
-                dash = (
-                    f"\r{rec_str} {mode_str} INPUT:[{raw_bar}] OUTPUT:[{out_bar}] "
-                    f"| -{reduction_db:4.1f}dB | Latency: {budget_str}   "
-                )
-                sys.stdout.write(dash)
-                sys.stdout.flush()
-            except queue.Empty:
-                pass
+                    raw_bar = "|" * int(min(1.0, in_pk * 3.5) * 10)
+                    out_bar = "|" * int(min(1.0, out_pk * 3.5) * 10)
+                    raw_bar += " " * (10 - len(raw_bar))
+                    out_bar += " " * (10 - len(out_bar))
 
-            if msvcrt.kbhit():
-                key = msvcrt.getch()
-                if key == b' ':
-                    toggle_anc()
-                elif key in (b'a', b'A'):
-                    toggle_live_recording()
-                elif key in (b'r', b'R'):
-                    save_buffer_recording()
-                elif key in (b'q', b'Q', b'\x1b', b'\r'):
-                    if is_recording_live:
+                    dash = (
+                        f"\r{rec_str} {mode_str} INPUT:[{raw_bar}] OUTPUT:[{out_bar}] "
+                        f"| -{reduction_db:4.1f}dB | Inference: {budget_str}   "
+                    )
+                    sys.stdout.write(dash)
+                    sys.stdout.flush()
+                except queue.Empty:
+                    pass
+
+                if msvcrt.kbhit():
+                    key = msvcrt.getch()
+                    if key == b' ':
+                        toggle_anc()
+                    elif key in (b'a', b'A'):
                         toggle_live_recording()
-                    print(Fore.YELLOW + "\n[INFO] Returning to Master Menu...")
-                    break
-            time.sleep(0.01)
+                    elif key in (b'r', b'R'):
+                        save_buffer_recording()
+                    elif key in (b'q', b'Q', b'\x1b', b'\r'):
+                        if is_recording_live:
+                            toggle_live_recording()
+                        print(Fore.YELLOW + "\n[INFO] Returning to Master Menu...")
+                        break
+                time.sleep(0.01)
+    finally:
+        stop_event.set()
+        worker_thread.join(timeout=1.0)
 
 # ----------------- MODE 2: BATCH & SPECTROGRAM ----------
 def run_batch_demo():
@@ -406,33 +434,41 @@ def run_batch_demo():
     input(Fore.WHITE + ">>> Press [ENTER] to record 5 seconds... <<<")
 
     print(Fore.RED + f"\n[*] RECORDING {DURATION} SECONDS...")
-    raw_audio = sd.rec(int(DURATION * SAMPLE_RATE), 
-                       device=INPUT_DEVICE_ID, 
-                       samplerate=SAMPLE_RATE, 
-                       channels=INPUT_CHANNELS, 
-                       dtype='float32')
+    raw_audio = sd.rec(
+        int(DURATION * SAMPLE_RATE),
+        device=INPUT_DEVICE_ID,
+        samplerate=SAMPLE_RATE,
+        channels=INPUT_CHANNELS,
+        dtype='float32'
+    )
     sd.wait()
 
-    if raw_audio.ndim > 1 and raw_audio.shape[1] > 1:
-        raw_channel = np.mean(raw_audio, axis=1)
-    else:
-        raw_channel = raw_audio.reshape(-1)
-
+    raw_channel = raw_audio[:, 0] if raw_audio.ndim > 1 else raw_audio.reshape(-1)
     raw_audio_1d = np.ascontiguousarray(raw_channel, dtype=np.float32)
-    sf.write("NoiseFilterAI_input_ONNX.wav", raw_audio_1d, SAMPLE_RATE)
+    sf.write("batch_input.wav", raw_audio_1d, SAMPLE_RATE)
 
     print(Fore.CYAN + "[*] PROCESSING: DeepFilterNet STFT Analysis...")
     audio_tensor = torch.from_numpy(raw_audio_1d).unsqueeze(0).contiguous()
-    
-    _, batch_df_state, _ = init_df()
+
+    # Instantiate a fresh DF state without reloading weights from disk
+    try:
+        batch_df_state = type(df_state)(
+            sr=df_state.sr(),
+            fft_size=df_state.fft_size(),
+            hop_size=df_state.hop_size(),
+            nb_bands=df_state.nb_bands(),
+        )
+    except Exception:
+        _, batch_df_state, _ = init_df()
+
     if hasattr(batch_df_state, "set_atten_lim"):
         batch_df_state.set_atten_lim(28.0)
 
     with torch.inference_mode():
         clean_tensor = enhance(model, batch_df_state, audio_tensor)
-    
+
     clean_audio_1d = np.ascontiguousarray(clean_tensor.squeeze().cpu().numpy(), dtype=np.float32)
-    sf.write("NoiseFilter_clean_ONNX.wav", clean_audio_1d, SAMPLE_RATE)
+    sf.write("batch_cleaned.wav", clean_audio_1d, SAMPLE_RATE)
     print(Fore.GREEN + "[SUCCESS] Clean audio generated!\n")
 
     raw_stereo = np.column_stack([raw_audio_1d, raw_audio_1d])
