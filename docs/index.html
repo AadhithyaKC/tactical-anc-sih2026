@@ -1729,6 +1729,11 @@
     // =========================================================================
     // 5. LIVE STREAM VISUALIZER (IMAGEDATA BUFFERED)
     // =========================================================================
+    function clearVisualizerCanvas() {
+      ctx.fillStyle = '#070709';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
     function startVisualizer() {
       if (animFrameId) cancelAnimationFrame(animFrameId);
 
@@ -1739,8 +1744,7 @@
       const specColImage = ctx.createImageData(2, h);
       const colPixels = specColImage.data;
 
-      ctx.fillStyle = '#070709';
-      ctx.fillRect(0, 0, w, h);
+      clearVisualizerCanvas();
 
       function render() {
         if (!isRunning || !analyserNode) return;
@@ -1782,8 +1786,7 @@
           ctx.putImageData(specColImage, w - 2, 0);
         } else {
           analyserNode.getByteTimeDomainData(timeDomain);
-          ctx.fillStyle = '#070709';
-          ctx.fillRect(0, 0, w, h);
+          clearVisualizerCanvas();
 
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
           ctx.lineWidth = 1;
@@ -2710,13 +2713,19 @@
     });
 
     document.getElementById('tabSpec').addEventListener('click', (e) => {
-      visMode = 'spec';
+      if (visMode !== 'spec') {
+        visMode = 'spec';
+        clearVisualizerCanvas();
+      }
       e.target.classList.add('active');
       document.getElementById('tabWave').classList.remove('active');
     });
 
     document.getElementById('tabWave').addEventListener('click', (e) => {
-      visMode = 'wave';
+      if (visMode !== 'wave') {
+        visMode = 'wave';
+        clearVisualizerCanvas();
+      }
       e.target.classList.add('active');
       document.getElementById('tabSpec').classList.remove('active');
     });
