@@ -3,779 +3,1065 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Noise Cancellation — Live & Batch Audio Studio</title>
+  <meta name="theme-color" content="#ECEDE9" />
+  <title>SILENTIA — Real-Time Acoustic Isolation Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg-canvas: #000000;
-      --bg-card: rgba(24, 24, 27, 0.72);
-      --bg-subcard: rgba(36, 36, 40, 0.55);
-      --bg-control: rgba(44, 44, 48, 0.7);
-      --bg-control-hover: rgba(58, 58, 64, 0.85);
-      --border-hairline: rgba(255, 255, 255, 0.08);
-      --border-specular: rgba(255, 255, 255, 0.14);
-      --text-primary: #f5f5f7;
-      --text-secondary: #a1a1a6;
-      --text-tertiary: #6e6e73;
-      --blue: #0a84ff;
-      --green: #30d158;
-      --amber: #ff9f0a;
-      --red: #ff453a;
-      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      --font-mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+      /* Architectural Daylight Stone Chassis */
+      --stone-ground: #ECEDE9;
+      --stone-surface: #F4F5F2;
+      --stone-recess: #E2E4DE;
+      --stone-hover: #D9DCD4;
+      --rule: #CFD2CA;
+      --rule-strong: #B4B8AE;
+
+      /* Ink Hierarchy (WCAG AA+ on stone) */
+      --ink: #121418;
+      --ink-secondary: #4D525C;
+      --ink-muted: #666C77;
+
+      /* Matte Anechoic Chamber */
+      --chamber: #090B0F;
+      --chamber-elev: #11141B;
+      --chamber-rule: rgba(241, 243, 240, 0.12);
+      --chamber-ink: #F1F3F0;
+      --chamber-muted: #8B93A1;
+
+      /* Precision Functional Signals */
+      --cobalt: #0044FF;
+      --cobalt-hover: #0036CC;
+      --cobalt-tint: rgba(0, 68, 255, 0.09);
+      --jade: #0B875B;
+      --jade-bright: #2DD4A0;
+      --jade-tint: rgba(11, 135, 91, 0.11);
+      --vermilion: #D93223;
+      --vermilion-tint: rgba(217, 50, 35, 0.11);
+      --ochre: #C47B0A;
+
+      /* Typography */
+      --font-display: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-ui: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    * {
+    *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      -webkit-font-smoothing: antialiased;
       -webkit-tap-highlight-color: transparent;
     }
 
+    ::selection {
+      background: var(--cobalt);
+      color: #FFFFFF;
+    }
+
+    html {
+      background: var(--stone-ground);
+      color: var(--ink);
+      font-family: var(--font-ui);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
     body {
-      background-color: var(--bg-canvas);
-      background-image:
-        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(120, 130, 155, 0.14), transparent),
-        radial-gradient(ellipse 60% 40% at 85% 100%, rgba(10, 132, 255, 0.07), transparent);
-      color: var(--text-primary);
-      font-family: var(--font-sans);
-      min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
+      background: var(--stone-ground);
+      color: var(--ink);
       line-height: 1.45;
+      padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
+      overflow-x: hidden;
     }
 
-    /* Header */
-    .header {
-      max-width: 1240px;
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--rule-strong); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--ink-muted); }
+
+    :focus-visible {
+      outline: 2px solid var(--cobalt);
+      outline-offset: 2px;
+    }
+
+    .hidden { display: none !important; }
+    .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+    /* =====================================================================
+       TOP ARCHITECTURAL BAR
+    ===================================================================== */
+    .topbar {
       width: 100%;
+      border-bottom: 1px solid var(--rule);
+      background: var(--stone-surface);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .topbar-inner {
+      max-width: 1440px;
       margin: 0 auto;
-      padding: 24px 20px 12px;
+      padding: 12px 16px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      gap: 12px;
       flex-wrap: wrap;
-      gap: 16px;
     }
 
-    @media (min-width: 768px) {
-      .header {
-        padding: 28px 28px 12px;
+    @media (min-width: 960px) {
+      .topbar-inner {
+        padding: 0 28px;
+        height: 62px;
+        flex-wrap: nowrap;
       }
     }
 
-    .title-group h1 {
-      font-size: 1.4rem;
-      font-weight: 600;
-      letter-spacing: -0.025em;
-      color: var(--text-primary);
-    }
-
-    @media (min-width: 768px) {
-      .title-group h1 {
-        font-size: 1.55rem;
-      }
-    }
-
-    .title-group p {
-      font-size: 0.82rem;
-      color: var(--text-secondary);
-      margin-top: 2px;
-      font-weight: 400;
-    }
-
-    @media (min-width: 768px) {
-      .title-group p {
-        font-size: 0.88rem;
-      }
-    }
-
-    .header-right {
+    .brand {
       display: flex;
       align-items: center;
       gap: 10px;
-      flex-wrap: wrap;
-      width: 100%;
+      min-width: 0;
     }
 
-    @media (min-width: 768px) {
-      .header-right {
-        width: auto;
-      }
-    }
-
-    /* Top Mode Switcher */
-    .mode-switcher {
-      display: inline-flex;
-      background: var(--bg-card);
-      border: 1px solid var(--border-hairline);
-      backdrop-filter: blur(20px);
-      padding: 4px;
-      border-radius: 12px;
-      gap: 4px;
-      flex: 1;
-    }
-
-    @media (min-width: 768px) {
-      .mode-switcher {
-        flex: unset;
-      }
-    }
-
-    .mode-tab {
-      background: transparent;
-      border: none;
-      color: var(--text-secondary);
-      font-family: var(--font-sans);
-      font-size: 0.8rem;
-      font-weight: 500;
-      padding: 8px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.18s ease;
-      flex: 1;
-      text-align: center;
-    }
-
-    @media (min-width: 768px) {
-      .mode-tab {
-        font-size: 0.82rem;
-        padding: 7px 14px;
-        flex: unset;
-      }
-    }
-
-    .mode-tab:hover {
-      color: var(--text-primary);
-    }
-
-    .mode-tab.active {
-      background: rgba(255, 255, 255, 0.14);
-      color: var(--text-primary);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-    }
-
-    .status-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: var(--bg-card);
-      border: 1px solid var(--border-hairline);
-      backdrop-filter: blur(20px);
-      font-size: 0.76rem;
-      font-weight: 500;
-      color: var(--text-secondary);
-      font-variant-numeric: tabular-nums;
-    }
-
-    @media (min-width: 768px) {
-      .pill {
-        padding: 7px 14px;
-        font-size: 0.8rem;
-      }
-    }
-
-    .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--text-tertiary);
-      transition: all 0.25s ease;
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--ink);
+      color: var(--stone-surface);
+      display: grid;
+      place-items: center;
       flex-shrink: 0;
     }
 
-    .dot.live {
-      background: var(--green);
-      box-shadow: 0 0 8px rgba(48, 209, 88, 0.65);
+    .brand-title {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--ink);
+      line-height: 1;
     }
 
-    .dot.loading {
-      background: var(--amber);
-      box-shadow: 0 0 8px rgba(255, 159, 10, 0.65);
-      animation: breathe 1.2s ease-in-out infinite;
-    }
-
-    .dot.recording {
-      background: var(--red);
-      box-shadow: 0 0 8px rgba(255, 69, 58, 0.75);
-      animation: breathe 1.4s ease-in-out infinite;
-    }
-
-    @keyframes breathe {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-
-    /* Main Grid */
-    .container {
-      max-width: 1240px;
-      width: 100%;
-      margin: 8px auto 30px;
-      padding: 0 16px;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 16px;
-      flex: 1;
-    }
-
-    @media (min-width: 981px) {
-      .container {
-        grid-template-columns: 1fr 370px;
-        margin: 12px auto 40px;
-        padding: 0 28px;
-        gap: 20px;
-      }
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    /* Frosted Glass Cards */
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-hairline);
-      border-top-color: var(--border-specular);
-      border-radius: 16px;
-      padding: 18px;
-      backdrop-filter: blur(28px) saturate(160%);
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-    }
-
-    @media (min-width: 768px) {
-      .card {
-        border-radius: 20px;
-        padding: 24px;
-        gap: 22px;
-      }
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .card-title {
-      font-size: 0.9rem;
-      font-weight: 600;
+    .brand-spec {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--ink-muted);
+      padding-left: 10px;
+      border-left: 1px solid var(--rule);
       letter-spacing: -0.01em;
-      color: var(--text-primary);
     }
 
-    @media (min-width: 768px) {
-      .card-title {
-        font-size: 0.95rem;
-      }
+    @media (min-width: 640px) {
+      .brand-spec { display: inline-block; }
     }
 
-    /* Mode Badge */
-    .mode-status {
-      font-size: 0.74rem;
-      font-weight: 500;
-      padding: 4px 10px;
-      border-radius: 999px;
-      transition: all 0.2s ease;
+    /* Mode Switcher */
+    .mode-nav {
+      display: inline-flex;
+      background: var(--stone-recess);
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .mode-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--ink-secondary);
+      font-family: var(--font-ui);
+      font-size: 0.84rem;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 180ms var(--ease-out-expo), color 180ms ease;
+      min-height: 36px;
       white-space: nowrap;
     }
 
-    @media (min-width: 768px) {
-      .mode-status {
-        font-size: 0.78rem;
-        padding: 5px 12px;
+    .mode-btn:hover { color: var(--ink); }
+
+    .mode-btn.active {
+      background: var(--stone-surface);
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(18, 20, 24, 0.1);
+    }
+
+    /* Engine Status Indicator */
+    .engine-readout {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--ink-secondary);
+      letter-spacing: -0.01em;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--rule-strong);
+      flex-shrink: 0;
+      transition: background 200ms ease;
+    }
+
+    .status-dot.live { background: var(--jade); }
+    .status-dot.loading { background: var(--ochre); animation: pulse-dot 1.1s ease-in-out infinite; }
+    .status-dot.rec { background: var(--vermilion); animation: pulse-dot 1.1s ease-in-out infinite; }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.25; }
+    }
+
+    /* =====================================================================
+       MAIN ARCHITECTURAL SHELL (NO FLOATING CARDS)
+    ===================================================================== */
+    .studio-shell {
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr;
+      border-left: 0;
+      border-right: 0;
+    }
+
+    @media (min-width: 1024px) {
+      .studio-shell {
+        grid-template-columns: minmax(0, 1fr) 356px;
+        border-left: 1px solid var(--rule);
+        border-right: 1px solid var(--rule);
       }
     }
 
-    .mode-status.off {
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--text-secondary);
-      border: 1px solid var(--border-hairline);
+    .primary-stage-col {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
     }
 
-    .mode-status.on {
-      background: rgba(48, 209, 88, 0.14);
-      color: var(--green);
-      border: 1px solid rgba(48, 209, 88, 0.35);
-    }
-
-    .mode-status.rec {
-      background: rgba(255, 69, 58, 0.16);
-      color: var(--red);
-      border: 1px solid rgba(255, 69, 58, 0.4);
-    }
-
-    /* Visualizer */
-    .visualizer-wrap {
+    /* =====================================================================
+       MONUMENTAL ANECHOIC CHAMBER (VISUAL ART STAGE)
+    ===================================================================== */
+    .chamber-frame {
       position: relative;
-      height: 210px;
-      background: #070709;
-      border-radius: 12px;
-      border: 1px solid var(--border-hairline);
+      background: var(--chamber);
+      color: var(--chamber-ink);
+      width: 100%;
       overflow: hidden;
+      border-bottom: 1px solid var(--rule);
     }
 
-    @media (min-width: 768px) {
-      .visualizer-wrap {
-        height: 250px;
-        border-radius: 14px;
+    .chamber-viewport {
+      position: relative;
+      width: 100%;
+      height: clamp(250px, 40vh, 340px);
+      background: var(--chamber);
+    }
+
+    @media (min-width: 1024px) {
+      .chamber-viewport {
+        height: clamp(360px, 50vh, 490px);
       }
     }
 
-    canvas {
+    .chamber-canvas {
       width: 100%;
       height: 100%;
       display: block;
     }
 
-    /* Dual Stacked Batch Spectrograms */
-    .batch-spec-stack {
+    /* Floating Minimal Controls inside Chamber */
+    .chamber-hud-top {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
       display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .spec-panel {
-      position: relative;
-      height: 145px;
-      background: #050408;
-      border-radius: 12px;
-      border: 1px solid var(--border-hairline);
-      overflow: hidden;
-    }
-
-    @media (min-width: 768px) {
-      .spec-panel {
-        height: 168px;
-        border-radius: 14px;
-      }
-    }
-
-    .spec-label-badge {
-      position: absolute;
-      top: 8px;
-      left: 10px;
-      background: rgba(14, 14, 18, 0.82);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--border-hairline);
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      pointer-events: none;
-    }
-
-    .spec-axis-hint {
-      position: absolute;
-      bottom: 6px;
-      right: 10px;
-      background: rgba(14, 14, 18, 0.75);
-      padding: 2px 6px;
-      border-radius: 5px;
-      font-family: var(--font-mono);
-      font-size: 0.64rem;
-      color: var(--text-secondary);
-      pointer-events: none;
-    }
-
-    .playhead-line {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: #30d158;
-      box-shadow: 0 0 8px rgba(48, 209, 88, 0.9);
-      left: 0%;
-      pointer-events: none;
-      display: none;
-    }
-
-    /* Apple-style Segmented Control */
-    .segmented-control {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      display: inline-flex;
-      background: rgba(28, 28, 32, 0.85);
-      backdrop-filter: blur(12px);
-      padding: 3px;
-      border-radius: 8px;
-      border: 1px solid var(--border-hairline);
-    }
-
-    .seg-btn {
-      background: transparent;
-      border: none;
-      color: var(--text-secondary);
-      font-family: var(--font-sans);
-      font-size: 0.72rem;
-      font-weight: 500;
-      padding: 4px 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.18s ease;
-    }
-
-    .seg-btn.active {
-      background: rgba(255, 255, 255, 0.14);
-      color: var(--text-primary);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-    }
-
-    /* Clean Stat Strip */
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      align-items: center;
+      justify-content: space-between;
       gap: 10px;
+      pointer-events: none;
+      z-index: 6;
     }
 
     @media (min-width: 768px) {
-      .stats-row {
-        gap: 12px;
+      .chamber-hud-top {
+        top: 18px;
+        left: 20px;
+        right: 20px;
       }
     }
 
-    .stat-box {
-      background: var(--bg-subcard);
-      border: 1px solid var(--border-hairline);
-      border-radius: 12px;
-      padding: 12px 14px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
+    .viz-switch {
+      pointer-events: auto;
+      display: inline-flex;
+      background: rgba(9, 11, 15, 0.78);
+      border: 1px solid var(--chamber-rule);
+      border-radius: 7px;
+      padding: 3px;
+      gap: 2px;
     }
 
-    @media (min-width: 768px) {
-      .stat-box {
-        border-radius: 14px;
-        padding: 16px 18px;
-      }
-    }
-
-    .stat-label {
-      font-size: 0.72rem;
-      color: var(--text-secondary);
+    .viz-tab {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--chamber-muted);
+      font-family: var(--font-ui);
+      font-size: 0.76rem;
       font-weight: 500;
+      padding: 6px 11px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 160ms ease, color 160ms ease;
+      min-height: 30px;
     }
 
-    @media (min-width: 768px) {
-      .stat-label {
-        font-size: 0.78rem;
-      }
+    .viz-tab:hover { color: var(--chamber-ink); }
+    .viz-tab.active {
+      background: rgba(241, 243, 240, 0.14);
+      color: var(--chamber-ink);
     }
 
-    .stat-number {
-      font-size: 1.15rem;
-      font-weight: 600;
-      letter-spacing: -0.025em;
-      color: var(--text-primary);
-      margin-top: 4px;
-      font-variant-numeric: tabular-nums;
+    .chamber-state-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 11px;
+      border-radius: 6px;
+      background: rgba(9, 11, 15, 0.78);
+      border: 1px solid var(--chamber-rule);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--chamber-muted);
+      white-space: nowrap;
     }
 
-    @media (min-width: 768px) {
-      .stat-number {
-        font-size: 1.45rem;
-        margin-top: 6px;
-      }
+    .chamber-state-tag.isolated {
+      color: var(--jade-bright);
+      border-color: rgba(45, 212, 160, 0.38);
+      background: rgba(11, 135, 91, 0.18);
     }
 
-    /* Level Meters */
-    .levels-panel {
-      background: var(--bg-subcard);
-      border: 1px solid var(--border-hairline);
-      border-radius: 12px;
-      padding: 14px;
+    .chamber-state-tag.recording {
+      color: #FF7A6E;
+      border-color: rgba(217, 50, 35, 0.45);
+      background: rgba(217, 50, 35, 0.2);
+    }
+
+    /* Chamber Standby Overlay (Art Invitation) */
+    .standby-overlay {
+      position: absolute;
+      inset: 0;
       display: flex;
       flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      background: radial-gradient(ellipse 65% 55% at 50% 50%, rgba(9, 11, 15, 0.58), rgba(9, 11, 15, 0.18));
+      transition: opacity 320ms var(--ease-out-expo), visibility 320ms ease;
+      z-index: 4;
+    }
+
+    .standby-overlay.dismissed {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .standby-headline {
+      font-family: var(--font-display);
+      font-size: clamp(1.5rem, 3.6vw, 2.55rem);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      color: var(--chamber-ink);
+      max-width: 18ch;
+      line-height: 1.08;
+      text-wrap: balance;
+    }
+
+    .standby-sub {
+      margin-top: 10px;
+      font-size: 0.9rem;
+      color: var(--chamber-muted);
+      max-width: 40ch;
+    }
+
+    .standby-cta {
+      margin-top: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 24px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: var(--cobalt);
+      color: #FFFFFF;
+      font-family: var(--font-ui);
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 160ms ease, transform 160ms var(--ease-out-expo);
+      min-height: 48px;
+    }
+
+    .standby-cta:hover { background: var(--cobalt-hover); }
+    .standby-cta:active { transform: scale(0.98); }
+
+    /* =====================================================================
+       INTEGRATED TELEMETRY STRIP (FUSED TO CHAMBER BOTTOM)
+    ===================================================================== */
+    .telemetry-strip {
+      background: var(--chamber-elev);
+      border-top: 1px solid var(--chamber-rule);
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: 1fr;
       gap: 12px;
     }
 
-    @media (min-width: 768px) {
-      .levels-panel {
-        border-radius: 14px;
-        padding: 16px 18px;
-        gap: 14px;
+    @media (min-width: 720px) {
+      .telemetry-strip {
+        padding: 14px 20px;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 24px;
       }
     }
 
-    .level-item {
+    .meters-inline {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .meter-channel {
       display: flex;
       flex-direction: column;
       gap: 6px;
     }
 
-    .level-top {
+    .meter-meta {
       display: flex;
       justify-content: space-between;
-      font-size: 0.78rem;
-      font-weight: 500;
-    }
-
-    .level-name {
-      color: var(--text-secondary);
-    }
-
-    .level-db {
-      font-family: var(--font-mono);
+      align-items: baseline;
       font-size: 0.72rem;
-      color: var(--text-tertiary);
+    }
+
+    .meter-label {
+      color: var(--chamber-muted);
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .meter-val {
+      font-family: var(--font-mono);
+      color: var(--chamber-ink);
       font-variant-numeric: tabular-nums;
     }
 
-    .track {
-      height: 7px;
-      background: rgba(0, 0, 0, 0.55);
-      border-radius: 999px;
+    .meter-rail {
+      position: relative;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.09);
+      border-radius: 2px;
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.04);
     }
 
-    @media (min-width: 768px) {
-      .track {
-        height: 8px;
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      transition: width 45ms linear;
+    }
+
+    .meter-fill.raw { background: #C8CED8; }
+    .meter-fill.clean { background: var(--jade-bright); }
+
+    .metrics-inline {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      border-top: 1px solid var(--chamber-rule);
+      padding-top: 10px;
+    }
+
+    @media (min-width: 720px) {
+      .metrics-inline {
+        border-top: 0;
+        border-left: 1px solid var(--chamber-rule);
+        padding-top: 0;
+        padding-left: 20px;
       }
     }
 
-    .fill {
-      height: 100%;
-      width: 0%;
-      border-radius: 999px;
-      transition: width 0.045s linear;
+    .metric-unit {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
     }
 
-    .fill.raw {
-      background: linear-gradient(90deg, #64748b, #e2e8f0);
+    .metric-k {
+      font-size: 0.68rem;
+      color: var(--chamber-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
-    .fill.clean {
-      background: linear-gradient(90deg, #0a84ff, #30d158);
+    .metric-v {
+      font-family: var(--font-mono);
+      font-size: 0.92rem;
+      font-weight: 500;
+      color: var(--chamber-ink);
+      font-variant-numeric: tabular-nums;
     }
 
-    /* Primary Controls */
-    .button-grid {
+    .metric-v.accent { color: var(--jade-bright); }
+
+    /* =====================================================================
+       PRIMARY TRANSPORT BAY (LIGHT ARCHITECTURAL SURFACE)
+    ===================================================================== */
+    .transport-bay {
+      padding: 18px 16px;
+      background: var(--stone-surface);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+    }
+
+    @media (min-width: 768px) {
+      .transport-bay {
+        padding: 22px 24px;
+        gap: 14px;
+      }
+    }
+
+    .transport-primary-row {
       display: grid;
       grid-template-columns: 1fr;
       gap: 10px;
     }
 
-    @media (min-width: 540px) {
-      .button-grid {
-        grid-template-columns: repeat(2, 1fr);
+    @media (min-width: 520px) {
+      .transport-primary-row {
+        grid-template-columns: 1fr 1.25fr;
         gap: 12px;
       }
     }
 
-    .btn {
+    .transport-secondary-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    @media (min-width: 520px) {
+      .transport-secondary-row {
+        gap: 10px;
+      }
+    }
+
+    .ctrl-btn {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px 16px;
+      min-height: 52px;
+      border-radius: 8px;
+      border: 1px solid var(--rule-strong);
+      background: var(--stone-ground);
+      color: var(--ink);
+      font-family: var(--font-ui);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 120ms ease;
+      text-align: left;
+    }
+
+    .ctrl-btn:hover:not(:disabled) {
+      background: var(--stone-hover);
+      border-color: var(--ink-muted);
+    }
+
+    .ctrl-btn:active:not(:disabled) { transform: scale(0.99); }
+    .ctrl-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    .ctrl-btn-lead {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .ctrl-btn-lead span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Primary Hardware States */
+    .ctrl-btn.solid-ink {
+      background: var(--ink);
+      color: #FFFFFF;
+      border-color: var(--ink);
+    }
+    .ctrl-btn.solid-ink:hover:not(:disabled) { background: #262A32; }
+
+    .ctrl-btn.solid-ink.active {
+      background: var(--vermilion-tint);
+      color: var(--vermilion);
+      border-color: rgba(217, 50, 35, 0.45);
+    }
+
+    .ctrl-btn.solid-cobalt {
+      background: var(--cobalt);
+      color: #FFFFFF;
+      border-color: var(--cobalt);
+    }
+    .ctrl-btn.solid-cobalt:hover:not(:disabled) { background: var(--cobalt-hover); }
+
+    .ctrl-btn.solid-cobalt.active {
+      background: var(--jade);
+      color: #FFFFFF;
+      border-color: var(--jade);
+    }
+
+    .ctrl-btn.rec-active {
+      background: var(--vermilion);
+      color: #FFFFFF;
+      border-color: var(--vermilion);
+    }
+
+    .ctrl-btn.ab-raw-active {
+      background: var(--ink);
+      color: #FFFFFF;
+      border-color: var(--ink);
+    }
+
+    .ctrl-btn.ab-clean-active {
+      background: var(--jade);
+      color: #FFFFFF;
+      border-color: var(--jade);
+    }
+
+    .ctrl-btn.compact {
+      min-height: 46px;
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      justify-content: center;
+    }
+
+    @media (min-width: 640px) {
+      .ctrl-btn.compact {
+        justify-content: space-between;
+        padding: 11px 14px;
+        font-size: 0.84rem;
+      }
+    }
+
+    .kbd {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 500;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid currentColor;
+      opacity: 0.55;
+      flex-shrink: 0;
+    }
+
+    @media (pointer: fine) and (min-width: 768px) {
+      .kbd { display: inline-block; }
+    }
+
+    /* =====================================================================
+       BATCH LAB — INTERACTIVE SPLIT CURTAIN & STACKED SPECTROGRAMS
+    ===================================================================== */
+    .batch-stage-wrap {
+      position: relative;
+      width: 100%;
+      height: clamp(270px, 44vh, 460px);
+      background: var(--chamber);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .batch-stage-wrap.drag-over::after {
+      content: 'Drop audio file to isolate voice';
+      position: absolute;
+      inset: 12px;
+      border: 2px dashed var(--cobalt);
+      border-radius: 8px;
+      background: rgba(9, 11, 15, 0.86);
+      color: var(--chamber-ink);
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 600;
+      display: grid;
+      place-items: center;
+      z-index: 20;
+    }
+
+    .split-view-layer {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+      touch-action: pan-y;
+    }
+
+    .curtain-divider {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      background: #FFFFFF;
+      transform: translateX(-1px);
+      z-index: 8;
+      pointer-events: none;
+    }
+
+    .curtain-handle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--stone-surface);
+      color: var(--ink);
+      border: 2px solid var(--ink);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+      display: grid;
+      place-items: center;
+      cursor: ew-resize;
+      pointer-events: auto;
+      touch-action: none;
+      z-index: 9;
+    }
+
+    .split-corner-label {
+      position: absolute;
+      bottom: 12px;
+      padding: 4px 9px;
+      border-radius: 5px;
+      background: rgba(9, 11, 15, 0.8);
+      border: 1px solid var(--chamber-rule);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--chamber-ink);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .split-corner-label.left { left: 14px; }
+    .split-corner-label.right { right: 14px; color: var(--jade-bright); border-color: rgba(45, 212, 160, 0.35); }
+
+    .stacked-view-layer {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    .stacked-pane {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stacked-pane + .stacked-pane {
+      border-top: 1px solid var(--chamber-rule);
+    }
+
+    .batch-playhead {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--jade-bright);
+      left: 0%;
+      pointer-events: none;
+      z-index: 7;
+      display: none;
+    }
+
+    .batch-progress-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.08);
+      z-index: 10;
+    }
+
+    .batch-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--cobalt);
+      transition: width 80ms linear;
+    }
+
+    .ab-deck {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* =====================================================================
+       RIGHT CALIBRATION RAIL (FLUSH DESKTOP COLUMN / CLEAN MOBILE DRAWERS)
+    ===================================================================== */
+    .calibration-rail {
+      background: var(--stone-ground);
+      border-top: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+    }
+
+    @media (min-width: 1024px) {
+      .calibration-rail {
+        border-top: 0;
+        border-left: 1px solid var(--rule);
+      }
+    }
+
+    .rail-section {
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .rail-section summary {
+      list-style: none;
+      padding: 15px 18px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 13px 16px;
-      border-radius: 12px;
-      border: 1px solid var(--border-hairline);
-      background: var(--bg-control);
-      color: var(--text-primary);
-      font-family: var(--font-sans);
-      font-size: 0.84rem;
-      font-weight: 500;
       cursor: pointer;
-      transition: all 0.16s ease;
-      min-height: 46px;
-    }
-
-    @media (min-width: 768px) {
-      .btn {
-        padding: 14px 18px;
-        font-size: 0.88rem;
-      }
-    }
-
-    .btn:hover:not(:disabled) {
-      background: var(--bg-control-hover);
-      border-color: var(--border-specular);
-    }
-
-    .btn:active:not(:disabled) {
-      transform: scale(0.99);
-    }
-
-    .btn:disabled {
-      opacity: 0.35;
-      cursor: not-allowed;
-    }
-
-    .btn-start {
-      background: var(--text-primary);
-      color: #000000;
+      font-family: var(--font-display);
+      font-size: 0.92rem;
       font-weight: 600;
-      border-color: transparent;
+      letter-spacing: -0.015em;
+      color: var(--ink);
+      user-select: none;
+      min-height: 50px;
     }
 
-    .btn-start:hover:not(:disabled) {
-      background: #ffffff;
+    .rail-section summary::-webkit-details-marker { display: none; }
+
+    .rail-chevron {
+      color: var(--ink-muted);
+      transition: transform 200ms var(--ease-out-expo);
     }
 
-    .btn-start.active {
-      background: rgba(255, 69, 58, 0.16);
-      color: var(--red);
-      border-color: rgba(255, 69, 58, 0.4);
+    .rail-section[open] .rail-chevron {
+      transform: rotate(180deg);
     }
 
-    .btn-anc.active {
-      background: rgba(48, 209, 88, 0.16);
-      color: var(--green);
-      border-color: rgba(48, 209, 88, 0.4);
+    @media (min-width: 1024px) {
+      .rail-section summary {
+        padding: 16px 22px 10px;
+        cursor: default;
+        pointer-events: none;
+        min-height: 0;
+      }
+      .rail-chevron { display: none; }
     }
 
-    .btn-rec.active {
-      background: rgba(255, 69, 58, 0.16);
-      color: var(--red);
-      border-color: rgba(255, 69, 58, 0.4);
+    .rail-body {
+      padding: 4px 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
 
-    .btn-blue.active {
-      background: rgba(10, 132, 255, 0.2);
-      color: var(--blue);
-      border-color: rgba(10, 132, 255, 0.45);
-    }
-
-    .shortcut {
-      display: none;
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      padding: 3px 7px;
-      border-radius: 6px;
-      background: rgba(0, 0, 0, 0.25);
-      color: inherit;
-      opacity: 0.75;
-    }
-
-    @media (min-width: 768px) {
-      .shortcut {
-        display: inline-block;
+    @media (min-width: 1024px) {
+      .rail-body {
+        padding: 6px 22px 22px;
       }
     }
 
-    .btn-start:not(.active) .shortcut {
-      background: rgba(0, 0, 0, 0.1);
-      color: #000000;
-    }
-
-    /* Sidebar Controls */
-    .field {
+    .param-group {
       display: flex;
       flex-direction: column;
       gap: 7px;
     }
 
-    .field-header {
+    .param-head {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      font-size: 0.8rem;
+      align-items: baseline;
+      gap: 8px;
     }
 
-    @media (min-width: 768px) {
-      .field-header {
-        font-size: 0.82rem;
-      }
-    }
-
-    .field-label {
-      color: var(--text-secondary);
+    .param-label {
+      font-size: 0.82rem;
       font-weight: 500;
+      color: var(--ink-secondary);
     }
 
-    .field-value {
-      color: var(--text-primary);
+    .param-value {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
       font-weight: 500;
+      color: var(--ink);
       font-variant-numeric: tabular-nums;
     }
 
-    select {
+    /* Native-Clean Select */
+    .studio-select {
       width: 100%;
-      padding: 12px 14px;
-      border-radius: 10px;
-      background: rgba(14, 14, 16, 0.9);
-      border: 1px solid var(--border-hairline);
-      color: var(--text-primary);
-      font-family: var(--font-sans);
-      font-size: 0.84rem;
+      padding: 11px 36px 11px 12px;
+      border-radius: 7px;
+      border: 1px solid var(--rule-strong);
+      background-color: var(--stone-surface);
+      color: var(--ink);
+      font-family: var(--font-ui);
+      font-size: 16px; /* Prevents iOS Safari zoom */
       outline: none;
       cursor: pointer;
-      transition: border-color 0.15s ease;
       appearance: none;
-      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a1a1a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234D525C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
-      background-position: right 12px center;
-      background-size: 16px;
-      padding-right: 36px;
-    }
-
-    select:focus {
-      border-color: var(--blue);
-    }
-
-    /* Sleek Range Sliders */
-    input[type="range"] {
-      -webkit-appearance: none;
-      width: 100%;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.12);
-      border-radius: 999px;
-      outline: none;
-      margin: 6px 0;
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #ffffff;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-      transition: transform 0.12s ease;
+      background-position: right 11px center;
+      transition: border-color 150ms ease;
     }
 
     @media (min-width: 768px) {
-      input[type="range"]::-webkit-slider-thumb {
-        width: 18px;
-        height: 18px;
+      .studio-select { font-size: 0.86rem; }
+    }
+
+    .studio-select:focus { border-color: var(--cobalt); }
+    .studio-select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    /* Precision Tactile Fader */
+    .studio-fader {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 99px;
+      background: var(--rule);
+      outline: none;
+      cursor: pointer;
+      margin: 6px 0;
+    }
+
+    .studio-fader::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--ink);
+      border: 3px solid var(--stone-surface);
+      box-shadow: 0 1px 4px rgba(18, 20, 24, 0.35);
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+
+    .studio-fader::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--ink);
+      border: 3px solid var(--stone-surface);
+      box-shadow: 0 1px 4px rgba(18, 20, 24, 0.35);
+      cursor: pointer;
+    }
+
+    @media (pointer: coarse) {
+      .studio-fader::-webkit-slider-thumb {
+        width: 26px;
+        height: 26px;
       }
     }
 
-    input[type="range"]::-webkit-slider-thumb:hover {
+    .studio-fader::-webkit-slider-thumb:hover {
+      background: var(--cobalt);
       transform: scale(1.08);
     }
 
-    .divider {
-      height: 1px;
-      background: var(--border-hairline);
-      margin: 2px 0;
+    /* Segmented Radio Pills (Test Noise Bench) */
+    .noise-bench {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      background: var(--stone-recess);
+      border: 1px solid var(--rule);
+      padding: 3px;
+      border-radius: 7px;
     }
 
-    /* Bright Activity Feed */
-    .activity-log {
-      background: rgba(10, 10, 12, 0.75);
-      border: 1px solid var(--border-hairline);
-      border-radius: 12px;
-      padding: 12px 14px;
-      height: 120px;
+    .bench-opt {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--ink-secondary);
+      font-family: var(--font-ui);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 8px 6px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 150ms ease, color 150ms ease;
+      min-height: 36px;
+    }
+
+    .bench-opt.active {
+      background: var(--stone-surface);
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(18, 20, 24, 0.1);
+    }
+
+    .bench-opt.active[data-noise="pink"],
+    .bench-opt.active[data-noise="white"] {
+      background: var(--ink);
+      color: #FFFFFF;
+    }
+
+    .param-hint {
+      font-size: 0.76rem;
+      color: var(--ink-muted);
+      line-height: 1.4;
+    }
+
+    /* Session Trace Log */
+    .trace-box {
+      background: var(--stone-surface);
+      border: 1px solid var(--rule);
+      border-radius: 7px;
+      padding: 10px 12px;
+      height: 148px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
@@ -783,318 +1069,455 @@
       font-size: 0.76rem;
     }
 
-    @media (min-width: 768px) {
-      .activity-log {
-        height: 135px;
-        font-size: 0.78rem;
-        gap: 7px;
-      }
-    }
-
-    .log-entry {
+    .trace-row {
       display: flex;
       gap: 8px;
-      color: var(--text-primary);
-      line-height: 1.35;
+      line-height: 1.38;
+      color: var(--ink-secondary);
     }
 
-    .log-time {
+    .trace-ts {
       font-family: var(--font-mono);
       font-size: 0.7rem;
-      color: var(--text-secondary);
+      color: var(--ink-muted);
       flex-shrink: 0;
     }
 
-    .log-entry.good .log-msg { color: #32d74b; font-weight: 500; }
-    .log-entry.warn .log-msg { color: #ffd60a; font-weight: 500; }
+    .trace-row.good .trace-msg { color: var(--jade); font-weight: 500; }
+    .trace-row.warn .trace-msg { color: var(--vermilion); font-weight: 500; }
   </style>
 </head>
 <body>
 
-  <!-- Clean Studio Header -->
-  <header class="header">
-    <div class="title-group">
-      <h1>Noise Cancellation</h1>
-      <p id="headerSubtitle">Real-time voice isolation · 48 kHz studio processing</p>
-    </div>
-
-    <div class="header-right">
-      <div class="mode-switcher" role="tablist">
-        <button id="modeLiveTab" class="mode-tab active" role="tab" aria-selected="true">Live Stream</button>
-        <button id="modeBatchTab" class="mode-tab" role="tab" aria-selected="false">Batch Studio</button>
+  <!-- Top Architectural Bar -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12h3l2-7 3 14 3-10 2 5 2-2h5"/>
+          </svg>
+        </div>
+        <span class="brand-title">SILENTIA</span>
+        <span class="brand-spec">DeepFilterNet3 · 48 kHz WASM</span>
       </div>
 
-      <div class="status-bar">
-        <div class="pill">
-          <span id="streamDot" class="dot"></span>
-          <span id="engineStatus">Ready</span>
-        </div>
-        <div class="pill" id="recPill">
-          <span id="recDot" class="dot"></span>
-          <span id="recStatusText">Not Recording</span>
-        </div>
+      <nav class="mode-nav" role="tablist" aria-label="Studio mode">
+        <button id="modeLiveTab" class="mode-btn active" role="tab" aria-selected="true">Live Chamber</button>
+        <button id="modeBatchTab" class="mode-btn" role="tab" aria-selected="false">Batch Lab</button>
+      </nav>
+
+      <div class="engine-readout" aria-live="polite">
+        <span id="statusDot" class="status-dot"></span>
+        <span id="engineStatus">Standby</span>
       </div>
     </div>
   </header>
 
-  <!-- Main Workspace -->
-  <main class="container">
-    <!-- Left Card: Live Stream Workspace (Mode 1) -->
-    <section id="liveWorkspace" class="card">
-      <div class="card-header">
-        <span class="card-title">Live Audio</span>
-        <span id="ancBadge" class="mode-status off">Off — Raw Mic</span>
-      </div>
+  <!-- Main Architectural Workspace -->
+  <main class="studio-shell">
+    <!-- Left Column: Visual Stage + Telemetry + Transport -->
+    <div class="primary-stage-col">
 
-      <!-- Visualizer -->
-      <div class="visualizer-wrap">
-        <canvas id="dspCanvas" width="800" height="250"></canvas>
-        <div class="segmented-control">
-          <button id="tabSpec" class="seg-btn active">Frequency</button>
-          <button id="tabWave" class="seg-btn">Waveform</button>
-        </div>
-      </div>
+      <!-- ===============================================================
+           MODE 1: LIVE CHAMBER
+      ================================================================ -->
+      <section id="liveWorkspace" aria-label="Live Chamber">
+        <div class="chamber-frame">
+          <div class="chamber-viewport">
+            <canvas id="liveCanvas" class="chamber-canvas"></canvas>
 
-      <!-- Key Stats -->
-      <div class="stats-row">
-        <div class="stat-box">
-          <div class="stat-label">Latency</div>
-          <div class="stat-number" id="latencyVal">0.0 ms</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-label">Noise Reduction</div>
-          <div class="stat-number" id="attenVal">0.0 dB</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-label">Replay Buffer</div>
-          <div class="stat-number">10.0 sec</div>
-        </div>
-      </div>
+            <div class="chamber-hud-top">
+              <div class="viz-switch" role="tablist" aria-label="Visualizer mode">
+                <button id="vizTopoBtn" class="viz-tab active" role="tab" aria-selected="true">Topography</button>
+                <button id="vizSpecBtn" class="viz-tab" role="tab" aria-selected="false">Spectrum</button>
+                <button id="vizWaveBtn" class="viz-tab" role="tab" aria-selected="false">Wave</button>
+              </div>
+              <div id="liveStateTag" class="chamber-state-tag">Standby</div>
+            </div>
 
-      <!-- Input & Output Meters -->
-      <div class="levels-panel">
-        <div class="level-item">
-          <div class="level-top">
-            <span class="level-name">Microphone Input</span>
-            <span class="level-db" id="inDbText">-inf dB</span>
+            <!-- Art Standby Invitation -->
+            <div id="liveStandbyOverlay" class="standby-overlay">
+              <h1 class="standby-headline">Sculpt human voice out of raw air.</h1>
+              <p class="standby-sub">Client-side neural noise isolation running natively at 48 kHz in WebAssembly. Zero servers, sub-20 ms frame budget.</p>
+              <button id="standbyStartBtn" class="standby-cta">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="22"/>
+                </svg>
+                <span>Enter Live Chamber</span>
+              </button>
+            </div>
           </div>
-          <div class="track">
-            <div id="inBar" class="fill raw"></div>
-          </div>
-        </div>
 
-        <div class="level-item">
-          <div class="level-top">
-            <span class="level-name">Cleaned Output</span>
-            <span class="level-db" id="outDbText">-inf dB</span>
-          </div>
-          <div class="track">
-            <div id="outBar" class="fill clean"></div>
-          </div>
-        </div>
-      </div>
+          <!-- Fused Telemetry Strip -->
+          <div class="telemetry-strip">
+            <div class="meters-inline">
+              <div class="meter-channel">
+                <div class="meter-meta">
+                  <span class="meter-label">Raw Input</span>
+                  <span id="inDbText" class="meter-val">-inf dB</span>
+                </div>
+                <div class="meter-rail"><div id="inBar" class="meter-fill raw"></div></div>
+              </div>
 
-      <!-- Action Buttons -->
-      <div class="button-grid">
-        <button id="startBtn" class="btn btn-start">
-          <span id="startBtnText">Start Audio</span>
-          <span class="shortcut">ENTER</span>
-        </button>
+              <div class="meter-channel">
+                <div class="meter-meta">
+                  <span class="meter-label">Isolated Output</span>
+                  <span id="outDbText" class="meter-val">-inf dB</span>
+                </div>
+                <div class="meter-rail"><div id="outBar" class="meter-fill clean"></div></div>
+              </div>
+            </div>
 
-        <button id="toggleAncBtn" class="btn btn-anc" disabled>
-          <span>Noise Cancellation</span>
-          <span class="shortcut">SPACE</span>
-        </button>
-
-        <button id="liveRecBtn" class="btn btn-rec" disabled>
-          <span id="liveRecText">Record Audio</span>
-          <span class="shortcut">A</span>
-        </button>
-
-        <button id="exportBufBtn" class="btn" disabled>
-          <span>Save Last 10 Seconds</span>
-          <span class="shortcut">R</span>
-        </button>
-      </div>
-    </section>
-
-    <!-- Left Card: Batch Benchmark & Dual Spectrogram Workspace (Mode 2) -->
-    <section id="batchWorkspace" class="card hidden">
-      <div class="card-header">
-        <span class="card-title">Superior Audio Processing · Dual Spectrogram</span>
-        <span id="batchBadge" class="mode-status off">Idle — 5.0s Capture</span>
-      </div>
-
-      <!-- Dual Stacked Inferno Spectrograms -->
-      <div class="batch-spec-stack">
-        <div class="spec-panel">
-          <canvas id="batchRawCanvas" width="800" height="168"></canvas>
-          <span class="spec-label-badge">Input (Corrupted)</span>
-          <span class="spec-axis-hint" id="rawAxisHint">0 – 24 kHz · 5.0 s</span>
-          <div id="rawPlayhead" class="playhead-line"></div>
-        </div>
-
-        <div class="spec-panel">
-          <canvas id="batchCleanCanvas" width="800" height="168"></canvas>
-          <span class="spec-label-badge">Output (AI Cleaned)</span>
-          <span class="spec-axis-hint" id="cleanAxisHint">DeepFilterNet3 STFT · inferno</span>
-          <div id="cleanPlayhead" class="playhead-line"></div>
-        </div>
-      </div>
-
-      <!-- Batch Metrics -->
-      <div class="stats-row">
-        <div class="stat-box">
-          <div class="stat-label">Clip Duration</div>
-          <div class="stat-number" id="batchDurVal">5.0 sec</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-label">Processing Speed</div>
-          <div class="stat-number" id="batchSpeedVal">—</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-label">Noise Floor Drop</div>
-          <div class="stat-number" id="batchSnrVal">—</div>
-        </div>
-      </div>
-
-      <!-- Capture Progress Meter -->
-      <div class="levels-panel">
-        <div class="level-item">
-          <div class="level-top">
-            <span class="level-name" id="batchMeterLabel">Capture / Processing Progress</span>
-            <span class="level-db" id="batchProgressText">Ready</span>
-          </div>
-          <div class="track">
-            <div id="batchProgressBar" class="fill clean"></div>
+            <div class="metrics-inline">
+              <div class="metric-unit">
+                <span class="metric-k">Frame</span>
+                <span id="latencyVal" class="metric-v">0.0 ms</span>
+              </div>
+              <div class="metric-unit">
+                <span class="metric-k">Suppression</span>
+                <span id="attenVal" class="metric-v accent">0.0 dB</span>
+              </div>
+              <div class="metric-unit">
+                <span class="metric-k">Buffer</span>
+                <span class="metric-v">10.0 s</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Batch Capture & A/B Controls -->
-      <div class="button-grid">
-        <button id="batchRecBtn" class="btn btn-start">
-          <span id="batchRecText">Record 5 Seconds</span>
-          <span class="shortcut">ENTER</span>
-        </button>
+        <!-- Primary Transport Bay -->
+        <div class="transport-bay">
+          <div class="transport-primary-row">
+            <button id="startBtn" class="ctrl-btn solid-ink">
+              <span class="ctrl-btn-lead">
+                <svg id="startIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="22"/>
+                </svg>
+                <span id="startBtnText">Start Live Audio</span>
+              </span>
+              <span class="kbd">ENTER</span>
+            </button>
 
-        <button id="batchUploadBtn" class="btn">
-          <span>Import Audio File</span>
-          <span class="shortcut">WAV/MP3</span>
-        </button>
-        <input id="batchFileInput" type="file" accept="audio/*" class="hidden" />
-
-        <button id="batchPlayRawBtn" class="btn btn-blue" disabled>
-          <span>Play Raw Input</span>
-          <span class="shortcut">1</span>
-        </button>
-
-        <button id="batchPlayCleanBtn" class="btn btn-anc" disabled>
-          <span>Play AI Cleaned</span>
-          <span class="shortcut">2</span>
-        </button>
-
-        <button id="batchStopPlayBtn" class="btn" disabled>
-          <span>Stop Playback</span>
-          <span class="shortcut">S</span>
-        </button>
-
-        <button id="batchDownloadBtn" class="btn" disabled>
-          <span>Download WAV Pair</span>
-          <span class="shortcut">D</span>
-        </button>
-      </div>
-    </section>
-
-    <!-- Right Card: Shared Devices, Tuning & Activity -->
-    <aside class="card">
-      <div class="card-header">
-        <span class="card-title">Audio Setup</span>
-      </div>
-
-      <div class="field">
-        <div class="field-header">
-          <span class="field-label">Microphone</span>
-        </div>
-        <select id="inputSelect">
-          <option value="">System Default Microphone</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <div class="field-header">
-          <span class="field-label">Headphones or Speakers</span>
-        </div>
-        <select id="outputSelect">
-          <option value="">System Default Output</option>
-        </select>
-      </div>
-
-      <div class="divider"></div>
-
-      <!-- Live Mode Sliders -->
-      <div id="liveTuningGroup" style="display: flex; flex-direction: column; gap: 18px;">
-        <div class="field">
-          <div class="field-header">
-            <span class="field-label">Voice Boost</span>
-            <span class="field-value" id="gainValText">2.5×</span>
+            <button id="toggleAncBtn" class="ctrl-btn solid-cobalt" disabled>
+              <span class="ctrl-btn-lead">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 12h2"/><path d="M6 8v8"/><path d="M10 5v14"/><path d="M14 9v6"/><path d="M18 11v2"/><path d="M22 12h-2"/>
+                </svg>
+                <span id="ancBtnText">Isolate Voice</span>
+              </span>
+              <span class="kbd">SPACE</span>
+            </button>
           </div>
-          <input id="gainSlider" type="range" min="0.5" max="4.0" step="0.1" value="2.5" />
-        </div>
 
-        <div class="field">
-          <div class="field-header">
-            <span class="field-label">Filter Strength</span>
-            <span class="field-value" id="blendValText">90% Filtered · 10% Natural</span>
+          <div class="transport-secondary-row">
+            <button id="liveRecBtn" class="ctrl-btn compact" disabled>
+              <span class="ctrl-btn-lead">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="7"/>
+                </svg>
+                <span id="liveRecText">Record</span>
+              </span>
+              <span class="kbd">A</span>
+            </button>
+
+            <button id="exportBufBtn" class="ctrl-btn compact" disabled>
+              <span class="ctrl-btn-lead">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>Save 10s</span>
+              </span>
+              <span class="kbd">R</span>
+            </button>
+
+            <button id="muteMonitorBtn" class="ctrl-btn compact">
+              <span class="ctrl-btn-lead">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                  <path id="speakerWaves" d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                </svg>
+                <span id="muteBtnLabel">Monitor On</span>
+              </span>
+              <span class="kbd">M</span>
+            </button>
           </div>
-          <input id="blendSlider" type="range" min="50" max="100" step="5" value="90" />
         </div>
+      </section>
 
-        <div class="field">
-          <div class="field-header">
-            <span class="field-label">Headphone Playback</span>
-            <span class="field-value" id="monitorValText">On</span>
+      <!-- ===============================================================
+           MODE 2: BATCH LAB (OFFLINE STFT + INTERACTIVE A/B CURTAIN)
+      ================================================================ -->
+      <section id="batchWorkspace" class="hidden" aria-label="Batch Lab">
+        <div class="chamber-frame">
+          <div id="batchStageWrap" class="batch-stage-wrap">
+            <div class="chamber-hud-top">
+              <div class="viz-switch" role="tablist" aria-label="Comparison layout">
+                <button id="batchViewSplitBtn" class="viz-tab active" role="tab" aria-selected="true">Split Curtain</button>
+                <button id="batchViewStackBtn" class="viz-tab" role="tab" aria-selected="false">Stacked</button>
+              </div>
+              <div id="batchStateTag" class="chamber-state-tag">Ready · 5.0 s</div>
+            </div>
+
+            <!-- Interactive Split Curtain Layer -->
+            <div id="splitViewLayer" class="split-view-layer">
+              <canvas id="batchSplitCanvas" class="chamber-canvas"></canvas>
+              <span class="split-corner-label left">RAW INPUT</span>
+              <span class="split-corner-label right">AI ISOLATED</span>
+              <div id="curtainDivider" class="curtain-divider">
+                <div id="curtainHandle" class="curtain-handle" role="slider" aria-label="Compare raw and isolated spectrogram" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 3 12 9 6"/><polyline points="15 6 21 12 15 18"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dual Stacked Layer -->
+            <div id="stackedViewLayer" class="stacked-view-layer hidden">
+              <div class="stacked-pane">
+                <canvas id="batchRawCanvas" class="chamber-canvas"></canvas>
+                <span class="split-corner-label left">RAW INPUT (CORRUPTED)</span>
+              </div>
+              <div class="stacked-pane">
+                <canvas id="batchCleanCanvas" class="chamber-canvas"></canvas>
+                <span class="split-corner-label right">AI ISOLATED (DEEPFILTERNET3)</span>
+              </div>
+            </div>
+
+            <div id="batchPlayhead" class="batch-playhead"></div>
+
+            <!-- Batch Empty Overlay -->
+            <div id="batchStandbyOverlay" class="standby-overlay">
+              <h2 class="standby-headline">Compare raw noise against neural silence.</h2>
+              <p class="standby-sub">Capture a mic clip or drop any WAV / MP3 / M4A file. Inspect both spectrograms with a draggable A/B curtain and gapless mid-play switching.</p>
+              <button id="batchOverlayRecBtn" class="standby-cta">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="7"/>
+                </svg>
+                <span id="batchOverlayRecText">Record 5s Benchmark</span>
+              </button>
+            </div>
+
+            <div class="batch-progress-bar">
+              <div id="batchProgressFill" class="batch-progress-fill"></div>
+            </div>
           </div>
-          <button id="muteMonitorBtn" class="btn" style="padding: 11px 14px;">
-            <span id="muteBtnLabel">Mute Playback</span>
-            <span class="shortcut">M</span>
-          </button>
-        </div>
-      </div>
 
-      <!-- Batch Mode Settings -->
-      <div id="batchTuningGroup" class="hidden" style="display: flex; flex-direction: column; gap: 18px;">
-        <div class="field">
-          <div class="field-header">
-            <span class="field-label">Capture Duration</span>
-            <span class="field-value" id="batchDurSettingText">5 Seconds</span>
+          <!-- Fused Batch Telemetry Strip -->
+          <div class="telemetry-strip">
+            <div class="meter-channel">
+              <div class="meter-meta">
+                <span id="batchStageLabel" class="meter-label">Offline STFT Pipeline</span>
+                <span id="batchProgressText" class="meter-val">Awaiting audio</span>
+              </div>
+              <div class="meter-rail"><div id="batchSubBar" class="meter-fill clean"></div></div>
+            </div>
+
+            <div class="metrics-inline">
+              <div class="metric-unit">
+                <span class="metric-k">Duration</span>
+                <span id="batchDurVal" class="metric-v">5.0 s</span>
+              </div>
+              <div class="metric-unit">
+                <span class="metric-k">Speed</span>
+                <span id="batchSpeedVal" class="metric-v">—</span>
+              </div>
+              <div class="metric-unit">
+                <span class="metric-k">Floor Drop</span>
+                <span id="batchSnrVal" class="metric-v accent">—</span>
+              </div>
+            </div>
           </div>
-          <input id="batchDurSlider" type="range" min="3" max="15" step="1" value="5" />
         </div>
 
-        <div class="field">
-          <div class="field-header">
-            <span class="field-label">Batch Output Gain</span>
-            <span class="field-value" id="batchGainText">2.5×</span>
+        <!-- Batch Transport Bay -->
+        <div class="transport-bay">
+          <div class="transport-primary-row">
+            <button id="batchRecBtn" class="ctrl-btn solid-ink">
+              <span class="ctrl-btn-lead">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="7"/>
+                </svg>
+                <span id="batchRecText">Record 5 Seconds</span>
+              </span>
+              <span class="kbd">ENTER</span>
+            </button>
+
+            <button id="batchUploadBtn" class="ctrl-btn">
+              <span class="ctrl-btn-lead">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span>Import Audio File</span>
+              </span>
+              <span class="kbd">DROP</span>
+            </button>
+            <input id="batchFileInput" type="file" accept="audio/*" class="hidden" />
           </div>
-          <input id="batchGainSlider" type="range" min="0.5" max="4.0" step="0.1" value="2.5" />
-        </div>
-      </div>
 
-      <div class="divider"></div>
+          <div class="ab-deck">
+            <button id="batchPlayRawBtn" class="ctrl-btn" disabled>
+              <span class="ctrl-btn-lead">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                <span>Listen: Raw</span>
+              </span>
+              <span class="kbd">1</span>
+            </button>
 
-      <div class="field">
-        <div class="field-header">
-          <span class="field-label">Activity</span>
+            <button id="batchPlayCleanBtn" class="ctrl-btn" disabled>
+              <span class="ctrl-btn-lead">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                <span>Listen: Isolated</span>
+              </span>
+              <span class="kbd">2</span>
+            </button>
+          </div>
+
+          <div class="transport-secondary-row" style="grid-template-columns: 1fr 1fr;">
+            <button id="batchStopPlayBtn" class="ctrl-btn compact" disabled>
+              <span class="ctrl-btn-lead">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="6" y="6" width="12" height="12"/>
+                </svg>
+                <span>Stop Playback</span>
+              </span>
+              <span class="kbd">S</span>
+            </button>
+
+            <button id="batchDownloadBtn" class="ctrl-btn compact" disabled>
+              <span class="ctrl-btn-lead">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>Export WAV Pair</span>
+              </span>
+              <span class="kbd">D</span>
+            </button>
+          </div>
         </div>
-        <div id="consoleBox" class="activity-log"></div>
-      </div>
+      </section>
+    </div>
+
+    <!-- Right Column: Architectural Calibration Rail -->
+    <aside class="calibration-rail" aria-label="Audio calibration">
+      <!-- Signal Routing -->
+      <details class="rail-section" id="secRouting" open>
+        <summary>
+          <span>Signal Routing</span>
+          <svg class="rail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </summary>
+        <div class="rail-body">
+          <div class="param-group">
+            <div class="param-head">
+              <label for="inputSelect" class="param-label">Microphone Input</label>
+            </div>
+            <select id="inputSelect" class="studio-select">
+              <option value="">System Default Microphone</option>
+            </select>
+          </div>
+
+          <div class="param-group" id="outputFieldWrap">
+            <div class="param-head">
+              <label for="outputSelect" class="param-label">Monitoring Output</label>
+            </div>
+            <select id="outputSelect" class="studio-select">
+              <option value="">System Default Output</option>
+            </select>
+          </div>
+        </div>
+      </details>
+
+      <!-- Acoustic Sculpting -->
+      <details class="rail-section" id="secSculpt" open>
+        <summary>
+          <span>Acoustic Sculpting</span>
+          <svg class="rail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </summary>
+        <div class="rail-body">
+          <!-- Live Mode Tuning -->
+          <div id="liveTuningGroup" style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="param-group">
+              <div class="param-head">
+                <label for="gainSlider" class="param-label">Voice Boost</label>
+                <span id="gainValText" class="param-value">2.5×</span>
+              </div>
+              <input id="gainSlider" class="studio-fader" type="range" min="0.5" max="4.0" step="0.1" value="2.5" />
+            </div>
+
+            <div class="param-group">
+              <div class="param-head">
+                <label for="blendSlider" class="param-label">Isolation Mix</label>
+                <span id="blendValText" class="param-value">90% Wet · 10% Air</span>
+              </div>
+              <input id="blendSlider" class="studio-fader" type="range" min="50" max="100" step="5" value="90" />
+            </div>
+
+            <div class="param-group">
+              <div class="param-head">
+                <span class="param-label">Pre-Filter Test Noise</span>
+                <span id="noiseBenchState" class="param-value">Off</span>
+              </div>
+              <div class="noise-bench" role="group" aria-label="Synthetic pre-filter test noise">
+                <button class="bench-opt active" data-noise="off">Off</button>
+                <button class="bench-opt" data-noise="pink">Rumble</button>
+                <button class="bench-opt" data-noise="white">Static</button>
+              </div>
+              <p class="param-hint">Injects calibrated noise before DeepFilterNet3 so you can test live voice isolation even in a quiet room.</p>
+            </div>
+          </div>
+
+          <!-- Batch Mode Tuning -->
+          <div id="batchTuningGroup" class="hidden" style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="param-group">
+              <div class="param-head">
+                <label for="batchDurSlider" class="param-label">Capture Length</label>
+                <span id="batchDurSettingText" class="param-value">5.0 s</span>
+              </div>
+              <input id="batchDurSlider" class="studio-fader" type="range" min="3" max="15" step="1" value="5" />
+            </div>
+
+            <div class="param-group">
+              <div class="param-head">
+                <label for="batchGainSlider" class="param-label">Isolated Output Gain</label>
+                <span id="batchGainText" class="param-value">2.2×</span>
+              </div>
+              <input id="batchGainSlider" class="studio-fader" type="range" min="0.5" max="4.0" step="0.1" value="2.2" />
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Session Trace -->
+      <details class="rail-section" id="secTrace">
+        <summary>
+          <span>Session Trace</span>
+          <svg class="rail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </summary>
+        <div class="rail-body">
+          <div id="consoleBox" class="trace-box" aria-live="polite"></div>
+        </div>
+      </details>
     </aside>
   </main>
 
   <script>
     // =========================================================================
-    // 1. REAL-TIME AUDIOWORKLET WITH DEEPFILTERNET3 WEBASSEMBLY ENGINE
+    // 1. REAL-TIME AUDIOWORKLET (DEEPFILTERNET3 + TEST NOISE BENCH + CAPTURE)
     // =========================================================================
     const workletSource = `
       if (typeof TextEncoder === 'undefined') {
@@ -1172,6 +1595,10 @@
           this.aiBlend = 0.90;
           this.ceiling = 0.98;
 
+          // Optional pre-filter synthetic test noise generator (Paul Kellet pink filter)
+          this.testNoise = 'off';
+          this.b0 = 0; this.b1 = 0; this.b2 = 0; this.b3 = 0; this.b4 = 0; this.b5 = 0; this.b6 = 0;
+
           this.frameCounter = 0;
           this.timeAccumMs = 0;
 
@@ -1184,9 +1611,7 @@
                 dfMod.initSync(new Uint8Array(d.wasmBytes));
 
                 const statePtr = dfMod.df_create(new Uint8Array(d.modelBytes), 28.0);
-                if (!statePtr) {
-                  throw new Error('df_create returned null state pointer.');
-                }
+                if (!statePtr) throw new Error('df_create returned null state pointer.');
 
                 const frameLen = dfMod.df_get_frame_length(statePtr);
                 if (frameLen && frameLen !== this.hopSize) {
@@ -1209,6 +1634,8 @@
               this.aiGain = d.gain;
             } else if (d.type === 'SET_BLEND') {
               this.aiBlend = d.blend;
+            } else if (d.type === 'SET_NOISE') {
+              this.testNoise = d.mode || 'off';
             } else if (d.type === 'FREE_WASM') {
               this.stopped = true;
               this.wasmReady = false;
@@ -1220,6 +1647,21 @@
           };
         }
 
+        nextTestNoise() {
+          if (this.testNoise === 'off') return 0;
+          const w = Math.random() * 2 - 1;
+          if (this.testNoise === 'white') return w * 0.085;
+          this.b0 = 0.99886 * this.b0 + w * 0.0555179;
+          this.b1 = 0.99332 * this.b1 + w * 0.0750759;
+          this.b2 = 0.96900 * this.b2 + w * 0.1538520;
+          this.b3 = 0.86650 * this.b3 + w * 0.3104856;
+          this.b4 = 0.55000 * this.b4 + w * 0.5329522;
+          this.b5 = -0.7616 * this.b5 - w * 0.0168980;
+          const pink = this.b0 + this.b1 + this.b2 + this.b3 + this.b4 + this.b5 + this.b6 + w * 0.5362;
+          this.b6 = w * 0.115926;
+          return pink * 0.032;
+        }
+
         process(inputs, outputs) {
           if (this.stopped) return false;
           const input = inputs[0];
@@ -1229,25 +1671,22 @@
           const outCh = output[0];
           const blockLen = outCh.length;
           const inCh = (input && input[0] && input[0].length > 0) ? input[0] : null;
+          const injectNoise = this.testNoise !== 'off';
 
           let inPeak = 0;
-          if (inCh) {
-            for (let i = 0; i < blockLen; i++) {
-              const s = inCh[i];
-              const abs = s < 0 ? -s : s;
-              if (abs > inPeak) inPeak = abs;
+          for (let i = 0; i < blockLen; i++) {
+            let s = inCh ? inCh[i] : 0;
+            if (injectNoise) s += this.nextTestNoise();
+            if (s > 1) s = 1;
+            else if (s < -1) s = -1;
 
-              this.inRing[this.inWrite] = s;
-              this.inWrite = (this.inWrite + 1) & this.ringMask;
-            }
-            this.inCount += blockLen;
-          } else {
-            for (let i = 0; i < blockLen; i++) {
-              this.inRing[this.inWrite] = 0;
-              this.inWrite = (this.inWrite + 1) & this.ringMask;
-            }
-            this.inCount += blockLen;
+            const abs = s < 0 ? -s : s;
+            if (abs > inPeak) inPeak = abs;
+
+            this.inRing[this.inWrite] = s;
+            this.inWrite = (this.inWrite + 1) & this.ringMask;
           }
+          this.inCount += blockLen;
 
           while (this.inCount >= this.hopSize) {
             const t0 = performance.now();
@@ -1369,9 +1808,7 @@
             }
 
             const statePtr = dfMod.df_create(new Uint8Array(d.modelBytes), 28.0);
-            if (!statePtr) {
-              throw new Error('Failed to initialize DeepFilterNet3 batch state.');
-            }
+            if (!statePtr) throw new Error('Failed to initialize DeepFilterNet3 batch state.');
 
             const hopSize = dfMod.df_get_frame_length(statePtr) || 480;
             const lookaheadFrames = 2;
@@ -1426,7 +1863,7 @@
     `;
 
     // =========================================================================
-    // 2. APPLICATION STATE & SHARED RESOURCES
+    // 2. APPLICATION STATE & DOM REFERENCES
     // =========================================================================
     const SAMPLE_RATE = 48000;
     const HISTORY_SAMPLES = 10 * SAMPLE_RATE;
@@ -1445,7 +1882,8 @@
     let audioCtx = null;
     let sourceNode = null;
     let workletNode = null;
-    let analyserNode = null;
+    let rawAnalyser = null;
+    let cleanAnalyser = null;
     let monitorGainNode = null;
     let mediaStream = null;
 
@@ -1456,79 +1894,115 @@
     let ancEnabled = false;
     let isRecordingLive = false;
     let monitorMuted = false;
-    let visMode = 'spec';
-    let animFrameId = null;
+    let testNoiseMode = 'off';
+    let visMode = 'topo'; // 'topo' | 'spec' | 'wave'
+    let liveAnimId = null;
 
-    // Batch Studio State (Mode 2)
+    // Topography 3D Waterfall Ring
+    const TOPO_LAYERS = 34;
+    const TOPO_BINS = 64;
+    let topoHistory = Array.from({ length: TOPO_LAYERS }, () => new Float32Array(TOPO_BINS));
+    let topoTick = 0;
+    let standbyPhase = 0;
+
+    // Batch Studio State
     let batchRawAudio = null;
     let batchPureAiAudio = null;
     let batchCleanAudio = null;
+    let batchViewMode = 'split'; // 'split' | 'stack'
+    let splitRatio = 0.5;
     let isBatchRecording = false;
     let isBatchProcessing = false;
-    let batchPlaybackCtx = null;
-    let batchPlaybackSource = null;
-    let batchPlaybackStartTime = 0;
-    let batchPlaybackDuration = 0;
+
+    // Offscreen rendered spectrograms for instant 60fps split curtain wiping
+    const offRawCanvas = document.createElement('canvas');
+    const offCleanCanvas = document.createElement('canvas');
+
+    // Gapless Synchronized A/B Playback State
+    let batchPlayCtx = null;
+    let batchSrcRaw = null;
+    let batchSrcClean = null;
+    let batchGainRaw = null;
+    let batchGainClean = null;
+    let batchPlayStartCtxTime = 0;
+    let batchPlayOffsetSec = 0;
+    let batchPlayDuration = 0;
     let batchPlayheadAnimId = null;
-    let activeBatchPlaybackType = null;
+    let activeBatchChannel = null; // 'raw' | 'clean' | null
 
     // DOM Elements
     const modeLiveTab = document.getElementById('modeLiveTab');
     const modeBatchTab = document.getElementById('modeBatchTab');
-    const headerSubtitle = document.getElementById('headerSubtitle');
+    const statusDot = document.getElementById('statusDot');
+    const engineStatus = document.getElementById('engineStatus');
+
     const liveWorkspace = document.getElementById('liveWorkspace');
     const batchWorkspace = document.getElementById('batchWorkspace');
     const liveTuningGroup = document.getElementById('liveTuningGroup');
     const batchTuningGroup = document.getElementById('batchTuningGroup');
 
+    const liveCanvas = document.getElementById('liveCanvas');
+    const liveCtx = liveCanvas.getContext('2d', { alpha: false });
+    const liveStandbyOverlay = document.getElementById('liveStandbyOverlay');
+    const standbyStartBtn = document.getElementById('standbyStartBtn');
+    const liveStateTag = document.getElementById('liveStateTag');
+
+    const vizTopoBtn = document.getElementById('vizTopoBtn');
+    const vizSpecBtn = document.getElementById('vizSpecBtn');
+    const vizWaveBtn = document.getElementById('vizWaveBtn');
+
     const startBtn = document.getElementById('startBtn');
     const startBtnText = document.getElementById('startBtnText');
     const toggleAncBtn = document.getElementById('toggleAncBtn');
+    const ancBtnText = document.getElementById('ancBtnText');
     const liveRecBtn = document.getElementById('liveRecBtn');
     const liveRecText = document.getElementById('liveRecText');
     const exportBufBtn = document.getElementById('exportBufBtn');
     const muteMonitorBtn = document.getElementById('muteMonitorBtn');
     const muteBtnLabel = document.getElementById('muteBtnLabel');
+    const speakerWaves = document.getElementById('speakerWaves');
+
+    const inBar = document.getElementById('inBar');
+    const outBar = document.getElementById('outBar');
+    const inDbText = document.getElementById('inDbText');
+    const outDbText = document.getElementById('outDbText');
+    const latencyVal = document.getElementById('latencyVal');
+    const attenVal = document.getElementById('attenVal');
 
     const inputSelect = document.getElementById('inputSelect');
     const outputSelect = document.getElementById('outputSelect');
+    const outputFieldWrap = document.getElementById('outputFieldWrap');
     const gainSlider = document.getElementById('gainSlider');
     const blendSlider = document.getElementById('blendSlider');
     const gainValText = document.getElementById('gainValText');
     const blendValText = document.getElementById('blendValText');
-    const monitorValText = document.getElementById('monitorValText');
-
-    const streamDot = document.getElementById('streamDot');
-    const engineStatus = document.getElementById('engineStatus');
-    const recDot = document.getElementById('recDot');
-    const recStatusText = document.getElementById('recStatusText');
-    const ancBadge = document.getElementById('ancBadge');
-
-    const latencyVal = document.getElementById('latencyVal');
-    const attenVal = document.getElementById('attenVal');
-    const inDbText = document.getElementById('inDbText');
-    const outDbText = document.getElementById('outDbText');
-    const inBar = document.getElementById('inBar');
-    const outBar = document.getElementById('outBar');
+    const noiseBenchState = document.getElementById('noiseBenchState');
+    const benchButtons = document.querySelectorAll('.bench-opt');
     const consoleBox = document.getElementById('consoleBox');
 
-    const canvas = document.getElementById('dspCanvas');
-    const ctx = canvas.getContext('2d', { alpha: false });
-
     // Batch DOM Elements
-    const batchBadge = document.getElementById('batchBadge');
+    const batchStageWrap = document.getElementById('batchStageWrap');
+    const batchViewSplitBtn = document.getElementById('batchViewSplitBtn');
+    const batchViewStackBtn = document.getElementById('batchViewStackBtn');
+    const batchStateTag = document.getElementById('batchStateTag');
+    const splitViewLayer = document.getElementById('splitViewLayer');
+    const stackedViewLayer = document.getElementById('stackedViewLayer');
+    const batchSplitCanvas = document.getElementById('batchSplitCanvas');
     const batchRawCanvas = document.getElementById('batchRawCanvas');
     const batchCleanCanvas = document.getElementById('batchCleanCanvas');
-    const rawAxisHint = document.getElementById('rawAxisHint');
-    const cleanAxisHint = document.getElementById('cleanAxisHint');
-    const rawPlayhead = document.getElementById('rawPlayhead');
-    const cleanPlayhead = document.getElementById('cleanPlayhead');
+    const curtainDivider = document.getElementById('curtainDivider');
+    const curtainHandle = document.getElementById('curtainHandle');
+    const batchPlayhead = document.getElementById('batchPlayhead');
+    const batchStandbyOverlay = document.getElementById('batchStandbyOverlay');
+    const batchOverlayRecBtn = document.getElementById('batchOverlayRecBtn');
+    const batchOverlayRecText = document.getElementById('batchOverlayRecText');
+    const batchProgressFill = document.getElementById('batchProgressFill');
+    const batchSubBar = document.getElementById('batchSubBar');
+    const batchStageLabel = document.getElementById('batchStageLabel');
+    const batchProgressText = document.getElementById('batchProgressText');
     const batchDurVal = document.getElementById('batchDurVal');
     const batchSpeedVal = document.getElementById('batchSpeedVal');
     const batchSnrVal = document.getElementById('batchSnrVal');
-    const batchMeterLabel = document.getElementById('batchMeterLabel');
-    const batchProgressText = document.getElementById('batchProgressText');
-    const batchProgressBar = document.getElementById('batchProgressBar');
     const batchRecBtn = document.getElementById('batchRecBtn');
     const batchRecText = document.getElementById('batchRecText');
     const batchUploadBtn = document.getElementById('batchUploadBtn');
@@ -1542,45 +2016,75 @@
     const batchGainSlider = document.getElementById('batchGainSlider');
     const batchGainText = document.getElementById('batchGainText');
 
-    function addActivity(msg, tone = '') {
+    // =========================================================================
+    // 3. UTILITIES, TRACE LOG & RESPONSIVE DRAWERS
+    // =========================================================================
+    function addTrace(msg, tone = '') {
       const now = new Date().toLocaleTimeString('en-US', {
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
+        hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'
       });
       const row = document.createElement('div');
-      row.className = `log-entry ${tone}`;
-      row.innerHTML = `<span class="log-time">${now}</span><span class="log-msg">${msg}</span>`;
+      row.className = `trace-row ${tone}`;
+      row.innerHTML = `<span class="trace-ts">${now}</span><span class="trace-msg">${msg}</span>`;
       consoleBox.appendChild(row);
-      while (consoleBox.children.length > 60) {
-        consoleBox.removeChild(consoleBox.firstChild);
-      }
+      while (consoleBox.children.length > 60) consoleBox.removeChild(consoleBox.firstChild);
       consoleBox.scrollTop = consoleBox.scrollHeight;
     }
 
+    function syncResponsiveDrawers() {
+      const isDesktop = window.innerWidth >= 1024;
+      const routing = document.getElementById('secRouting');
+      const sculpt = document.getElementById('secSculpt');
+      const trace = document.getElementById('secTrace');
+      if (isDesktop) {
+        routing.open = true;
+        sculpt.open = true;
+        trace.open = true;
+      } else {
+        routing.open = false;
+        sculpt.open = true;
+        trace.open = false;
+      }
+    }
+    syncResponsiveDrawers();
+
+    // Hide Output Selector gracefully on mobile browsers that do not support setSinkId
+    if (typeof AudioContext !== 'undefined' && !('setSinkId' in AudioContext.prototype)) {
+      outputFieldWrap.classList.add('hidden');
+    }
+
+    function syncCanvasSize(canvasEl) {
+      const rect = canvasEl.getBoundingClientRect();
+      if (!rect.width || !rect.height) return false;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const targetW = Math.round(rect.width * dpr);
+      const targetH = Math.round(rect.height * dpr);
+      if (canvasEl.width !== targetW || canvasEl.height !== targetH) {
+        canvasEl.width = targetW;
+        canvasEl.height = targetH;
+        return true;
+      }
+      return false;
+    }
+
     // =========================================================================
-    // 3. LOAD WEBASSEMBLY ENGINE & MODEL WEIGHTS
+    // 4. WASM ASSETS & WORKER MANAGEMENT
     // =========================================================================
     async function loadEngineAssets() {
       if (cachedAssets) return cachedAssets;
-
       const [jsRes, wasmRes, modelRes] = await Promise.all([
         fetch('./df.js'),
         fetch('./df_bg.wasm'),
         fetch('./DeepFilterNet3_ll_onnx.tar.gz')
       ]);
-
       if (!jsRes.ok || !wasmRes.ok || !modelRes.ok) {
-        throw new Error('Missing df.js, df_bg.wasm, or DeepFilterNet3_ll_onnx.tar.gz in docs/.');
+        throw new Error('Could not fetch df.js, df_bg.wasm, or DeepFilterNet3_ll_onnx.tar.gz.');
       }
-
       const [dfJsCode, wasmBytes, modelBytes] = await Promise.all([
         jsRes.text(),
         wasmRes.arrayBuffer(),
         modelRes.arrayBuffer()
       ]);
-
       cachedAssets = { dfJsCode, wasmBytes, modelBytes };
       return cachedAssets;
     }
@@ -1595,20 +2099,18 @@
     }
 
     // =========================================================================
-    // 4. HARDWARE DEVICES & HOT-SWAPPING
+    // 5. HARDWARE DEVICES & WAV EXPORT
     // =========================================================================
     function buildMicConstraints(deviceId) {
-      const audioConstraints = {
+      const audio = {
         channelCount: { ideal: 1 },
         sampleRate: { ideal: SAMPLE_RATE },
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false
       };
-      if (deviceId) {
-        audioConstraints.deviceId = { exact: deviceId };
-      }
-      return { audio: audioConstraints };
+      if (deviceId) audio.deviceId = { exact: deviceId };
+      return { audio };
     }
 
     async function populateDevices() {
@@ -1618,11 +2120,11 @@
         const inputs = devices.filter(d => d.kind === 'audioinput');
         const outputs = devices.filter(d => d.kind === 'audiooutput');
 
-        const activeMicTrack = mediaStream && mediaStream.getAudioTracks()[0];
-        const activeMicId = (activeMicTrack && activeMicTrack.getSettings().deviceId) || inputSelect.value;
+        const activeTrack = mediaStream && mediaStream.getAudioTracks()[0];
+        const activeId = (activeTrack && activeTrack.getSettings().deviceId) || inputSelect.value;
 
         if (inputs.length > 0) {
-          const prevIn = inputSelect.value || activeMicId || '';
+          const prevIn = inputSelect.value || activeId || '';
           inputSelect.innerHTML =
             `<option value="">System Default Microphone</option>` +
             inputs
@@ -1658,20 +2160,17 @@
         if (sourceNode) {
           try { sourceNode.disconnect(); } catch (_) {}
         }
-        if (mediaStream) {
-          mediaStream.getTracks().forEach(t => t.stop());
-        }
+        if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
 
         mediaStream = newStream;
         sourceNode = newSource;
+        sourceNode.connect(rawAnalyser);
         sourceNode.connect(workletNode);
 
-        if (audioCtx.state === 'suspended') {
-          await audioCtx.resume();
-        }
-        addActivity('Switched microphone input.', 'good');
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+        addTrace('Hot-swapped microphone input.', 'good');
       } catch (err) {
-        addActivity(`Microphone switch failed: ${err.message}`, 'warn');
+        addTrace(`Mic switch failed: ${err.message}`, 'warn');
       }
     }
 
@@ -1681,7 +2180,6 @@
       const writeStr = (offset, str) => {
         for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
       };
-
       writeStr(0, 'RIFF');
       view.setUint32(4, 36 + samples.length * 2, true);
       writeStr(8, 'WAVE');
@@ -1713,12 +2211,13 @@
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     }
 
-    function playCueBeep(freq, duration = 0.065) {
+    function playCueChime(freq, duration = 0.065) {
       if (!audioCtx || audioCtx.state !== 'running') return;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
+      osc.type = 'sine';
       osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.07, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.055, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
@@ -1727,114 +2226,309 @@
     }
 
     // =========================================================================
-    // 5. LIVE STREAM VISUALIZER (IMAGEDATA BUFFERED)
+    // 6. HIGH-DPI ACOUSTIC ART ENGINE (TOPOGRAPHY / SPECTRUM / DUAL WAVE)
     // =========================================================================
-    function clearVisualizerCanvas() {
-      ctx.fillStyle = '#070709';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const INFERNO_LUT = (() => {
+      const stops = [
+        [0.00, [9, 11, 15]],
+        [0.16, [24, 15, 68]],
+        [0.32, [74, 16, 112]],
+        [0.48, [130, 32, 108]],
+        [0.64, [196, 62, 74]],
+        [0.80, [238, 112, 38]],
+        [0.92, [252, 175, 22]],
+        [1.00, [252, 255, 190]]
+      ];
+      const lut = new Uint8ClampedArray(256 * 3);
+      for (let i = 0; i < 256; i++) {
+        const t = i / 255;
+        let s0 = stops[0], s1 = stops[stops.length - 1];
+        for (let k = 0; k < stops.length - 1; k++) {
+          if (t >= stops[k][0] && t <= stops[k + 1][0]) { s0 = stops[k]; s1 = stops[k + 1]; break; }
+        }
+        const f = s1[0] === s0[0] ? 0 : (t - s0[0]) / (s1[0] - s0[0]);
+        lut[i * 3]     = Math.round(s0[1][0] + (s1[1][0] - s0[1][0]) * f);
+        lut[i * 3 + 1] = Math.round(s0[1][1] + (s1[1][1] - s0[1][1]) * f);
+        lut[i * 3 + 2] = Math.round(s0[1][2] + (s1[1][2] - s0[1][2]) * f);
+      }
+      return lut;
+    })();
+
+    let specColImage = null;
+    let liveFreqBins = null;
+    let liveRawWave = null;
+    let liveCleanWave = null;
+
+    function clearLiveCanvas() {
+      syncCanvasSize(liveCanvas);
+      liveCtx.fillStyle = '#090B0F';
+      liveCtx.fillRect(0, 0, liveCanvas.width, liveCanvas.height);
+      specColImage = liveCtx.createImageData(2, Math.max(1, liveCanvas.height));
+      for (let i = 0; i < TOPO_LAYERS; i++) topoHistory[i].fill(0);
     }
 
-    function startVisualizer() {
-      if (animFrameId) cancelAnimationFrame(animFrameId);
+    function setLiveVisMode(mode) {
+      if (visMode === mode) return;
+      visMode = mode;
+      vizTopoBtn.classList.toggle('active', mode === 'topo');
+      vizTopoBtn.setAttribute('aria-selected', mode === 'topo');
+      vizSpecBtn.classList.toggle('active', mode === 'spec');
+      vizSpecBtn.setAttribute('aria-selected', mode === 'spec');
+      vizWaveBtn.classList.toggle('active', mode === 'wave');
+      vizWaveBtn.setAttribute('aria-selected', mode === 'wave');
+      // Always wipe cleanly when switching between modes (desktop & Android)
+      clearLiveCanvas();
+    }
 
-      const freqBins = new Uint8Array(analyserNode.frequencyBinCount);
-      const timeDomain = new Uint8Array(analyserNode.fftSize);
-      const h = canvas.height;
-      const w = canvas.width;
-      const specColImage = ctx.createImageData(2, h);
-      const colPixels = specColImage.data;
+    function drawTopographyFrame(W, H, liveActive) {
+      liveCtx.fillStyle = '#090B0F';
+      liveCtx.fillRect(0, 0, W, H);
 
-      clearVisualizerCanvas();
-
-      function render() {
-        if (!isRunning || !analyserNode) return;
-        animFrameId = requestAnimationFrame(render);
-
-        if (visMode === 'spec') {
-          analyserNode.getByteFrequencyData(freqBins);
-          ctx.drawImage(canvas, -2, 0);
-
-          const usableBins = Math.floor(freqBins.length * 0.65);
-
-          for (let y = 0; y < h; y++) {
-            const binIdx = (((h - 1 - y) * usableBins) / h) | 0;
-            const ratio = freqBins[binIdx] / 255;
-
-            let r = 7, g = 7, b = 9;
-            if (ratio > 0.04) {
-              if (ancEnabled) {
-                r = (30 + 215 * Math.pow(ratio, 2.2)) | 0;
-                g = (90 + 165 * Math.pow(ratio, 0.9)) | 0;
-                b = (140 + 115 * Math.pow(ratio, 1.1)) | 0;
-              } else {
-                r = (60 + 195 * ratio) | 0;
-                g = (65 + 145 * Math.pow(ratio, 1.3)) | 0;
-                b = (85 + 90 * Math.pow(ratio, 1.8)) | 0;
-              }
-            }
-
-            const p0 = y * 8;
-            colPixels[p0]     = r;
-            colPixels[p0 + 1] = g;
-            colPixels[p0 + 2] = b;
-            colPixels[p0 + 3] = 255;
-            colPixels[p0 + 4] = r;
-            colPixels[p0 + 5] = g;
-            colPixels[p0 + 6] = b;
-            colPixels[p0 + 7] = 255;
+      topoTick++;
+      if (topoTick % 2 === 0) {
+        const recycled = topoHistory.pop();
+        if (liveActive && cleanAnalyser && liveFreqBins) {
+          cleanAnalyser.getByteFrequencyData(liveFreqBins);
+          const maxBin = Math.floor(liveFreqBins.length * 0.58);
+          for (let i = 0; i < TOPO_BINS; i++) {
+            // Log-like spacing so vocal fundamentals (100Hz - 4kHz) have sculptural prominence
+            const t = i / (TOPO_BINS - 1);
+            const idx = Math.min(maxBin - 1, Math.floor(Math.pow(t, 1.45) * maxBin));
+            const val = liveFreqBins[idx] / 255;
+            recycled[i] = val;
           }
-          ctx.putImageData(specColImage, w - 2, 0);
         } else {
-          analyserNode.getByteTimeDomainData(timeDomain);
-          clearVisualizerCanvas();
-
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(0, h / 2);
-          ctx.lineTo(w, h / 2);
-          ctx.stroke();
-
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = ancEnabled ? '#30d158' : '#e5e5ea';
-          ctx.beginPath();
-
-          const sliceWidth = w / timeDomain.length;
-          let x = 0;
-          for (let i = 0; i < timeDomain.length; i++) {
-            const v = timeDomain[i] / 128.0;
-            const y = (v * h) / 2;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-            x += sliceWidth;
+          // Serene ambient breathing field in standby
+          standbyPhase += 0.045;
+          for (let i = 0; i < TOPO_BINS; i++) {
+            const x = i / (TOPO_BINS - 1);
+            const env = Math.sin(x * Math.PI);
+            const w1 = Math.sin(x * 11 + standbyPhase) * 0.5 + 0.5;
+            const w2 = Math.cos(x * 19 - standbyPhase * 0.7) * 0.5 + 0.5;
+            recycled[i] = env * env * (0.08 + 0.14 * w1 * w2);
           }
-          ctx.lineTo(w, h / 2);
-          ctx.stroke();
+        }
+        topoHistory.unshift(recycled);
+      }
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const horizonY = H * 0.22;
+      const bottomY = H * 0.94;
+      const maxLift = H * 0.28;
+
+      // Draw from farthest ridge (index TOPO_LAYERS - 1) to closest (index 0)
+      for (let layer = TOPO_LAYERS - 1; layer >= 0; layer--) {
+        const depth = 1 - layer / (TOPO_LAYERS - 1); // 0 = far, 1 = near
+        const persp = Math.pow(depth, 1.38);
+        const baseY = horizonY + (bottomY - horizonY) * persp;
+        const spanW = W * (0.62 + 0.44 * persp);
+        const startX = (W - spanW) * 0.5;
+        const stepX = spanW / (TOPO_BINS - 1);
+        const ampScale = maxLift * (0.28 + 0.72 * persp);
+        const slice = topoHistory[layer];
+
+        liveCtx.beginPath();
+        liveCtx.moveTo(startX, baseY + 40);
+
+        let energySum = 0;
+        for (let i = 0; i < TOPO_BINS; i++) {
+          const v = slice[i];
+          energySum += v;
+          const x = startX + i * stepX;
+          const y = baseY - v * ampScale;
+          if (i === 0) {
+            liveCtx.lineTo(x, y);
+          } else {
+            const prevX = startX + (i - 1) * stepX;
+            const prevY = baseY - slice[i - 1] * ampScale;
+            const cx = (prevX + x) * 0.5;
+            const cy = (prevY + y) * 0.5;
+            liveCtx.quadraticCurveTo(prevX, prevY, cx, cy);
+          }
+        }
+        const lastX = startX + spanW;
+        const lastY = baseY - slice[TOPO_BINS - 1] * ampScale;
+        liveCtx.lineTo(lastX, lastY);
+        liveCtx.lineTo(lastX, baseY + 40);
+        liveCtx.closePath();
+
+        // Matte obsidian occlusion fill
+        liveCtx.fillStyle = '#090B0F';
+        liveCtx.fill();
+
+        // Architectural line stroke colored by live state
+        const avgEnergy = energySum / TOPO_BINS;
+        const alpha = 0.08 + 0.78 * Math.pow(depth, 1.25);
+
+        if (liveActive && ancEnabled) {
+          // Isolated voice: serene cobalt horizon shifting to luminous jade on vocal ridges
+          const jadeMix = Math.min(1, avgEnergy * 3.8);
+          const r = Math.round(35 + (45 - 35) * jadeMix);
+          const g = Math.round(108 + (212 - 108) * jadeMix);
+          const b = Math.round(255 + (160 - 255) * jadeMix);
+          liveCtx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+        } else if (liveActive) {
+          // Raw mic: crisp silver-chalk ridges
+          liveCtx.strokeStyle = `rgba(222, 227, 236, ${alpha.toFixed(3)})`;
+        } else {
+          // Standby: subtle cobalt-tinted architectural lines
+          liveCtx.strokeStyle = `rgba(140, 168, 235, ${(alpha * 0.48).toFixed(3)})`;
+        }
+
+        liveCtx.lineWidth = (0.75 + 0.85 * persp) * dpr;
+        liveCtx.stroke();
+      }
+    }
+
+    function drawSpectrumFrame(W, H, liveActive) {
+      if (!specColImage || specColImage.height !== H) {
+        specColImage = liveCtx.createImageData(2, H);
+      }
+      if (!liveActive || !cleanAnalyser || !liveFreqBins) {
+        liveCtx.fillStyle = '#090B0F';
+        liveCtx.fillRect(0, 0, W, H);
+        return;
+      }
+
+      cleanAnalyser.getByteFrequencyData(liveFreqBins);
+      liveCtx.drawImage(liveCanvas, -2, 0);
+
+      const pixels = specColImage.data;
+      const usableBins = Math.floor(liveFreqBins.length * 0.65);
+
+      for (let y = 0; y < H; y++) {
+        const binIdx = (((H - 1 - y) * usableBins) / H) | 0;
+        const ratio = liveFreqBins[binIdx] / 255;
+        let r = 9, g = 11, b = 15;
+
+        if (ratio > 0.03) {
+          if (ancEnabled) {
+            // Precision cobalt -> jade -> alabaster thermal scale for isolated vocals
+            r = Math.min(255, Math.floor(14 + 210 * Math.pow(ratio, 2.2)));
+            g = Math.min(255, Math.floor(55 + 195 * Math.pow(ratio, 0.95)));
+            b = Math.min(255, Math.floor(125 + 125 * Math.pow(ratio, 1.05)));
+          } else {
+            const lutIdx = ((ratio * 255) | 0) * 3;
+            r = INFERNO_LUT[lutIdx];
+            g = INFERNO_LUT[lutIdx + 1];
+            b = INFERNO_LUT[lutIdx + 2];
+          }
+        }
+
+        const p = y * 8;
+        pixels[p] = r; pixels[p + 1] = g; pixels[p + 2] = b; pixels[p + 3] = 255;
+        pixels[p + 4] = r; pixels[p + 5] = g; pixels[p + 6] = b; pixels[p + 7] = 255;
+      }
+      liveCtx.putImageData(specColImage, W - 2, 0);
+    }
+
+    function drawWaveFrame(W, H, liveActive) {
+      liveCtx.fillStyle = '#090B0F';
+      liveCtx.fillRect(0, 0, W, H);
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const midY = H * 0.5;
+
+      // Subtle architectural center axis & quartile hairlines
+      liveCtx.strokeStyle = 'rgba(241, 243, 240, 0.07)';
+      liveCtx.lineWidth = dpr;
+      liveCtx.beginPath();
+      liveCtx.moveTo(0, midY); liveCtx.lineTo(W, midY);
+      liveCtx.moveTo(0, H * 0.25); liveCtx.lineTo(W, H * 0.25);
+      liveCtx.moveTo(0, H * 0.75); liveCtx.lineTo(W, H * 0.75);
+      liveCtx.stroke();
+
+      if (!liveActive || !cleanAnalyser || !liveCleanWave) return;
+
+      // Ghost trace: Raw microphone waveform (when ANC is active)
+      if (ancEnabled && rawAnalyser && liveRawWave) {
+        rawAnalyser.getFloatTimeDomainData(liveRawWave);
+        liveCtx.beginPath();
+        liveCtx.strokeStyle = 'rgba(200, 206, 216, 0.26)';
+        liveCtx.lineWidth = 1.2 * dpr;
+        const step = W / (liveRawWave.length - 1);
+        for (let i = 0; i < liveRawWave.length; i++) {
+          const x = i * step;
+          const y = midY - liveRawWave[i] * (H * 0.42);
+          if (i === 0) liveCtx.moveTo(x, y);
+          else liveCtx.lineTo(x, y);
+        }
+        liveCtx.stroke();
+      }
+
+      // Primary trace: Cleaned or live output waveform with rising zero-crossing trigger
+      cleanAnalyser.getFloatTimeDomainData(liveCleanWave);
+      let triggerIdx = 0;
+      const searchLim = Math.floor(liveCleanWave.length * 0.45);
+      for (let i = 1; i < searchLim; i++) {
+        if (liveCleanWave[i - 1] < 0 && liveCleanWave[i] >= 0) {
+          triggerIdx = i;
+          break;
         }
       }
-      render();
+
+      const drawLen = liveCleanWave.length - triggerIdx;
+      const step = W / Math.max(1, drawLen - 1);
+      liveCtx.beginPath();
+      liveCtx.strokeStyle = ancEnabled ? '#2DD4A0' : '#F1F3F0';
+      liveCtx.lineWidth = 2.0 * dpr;
+      for (let i = 0; i < drawLen; i++) {
+        const x = i * step;
+        const y = midY - liveCleanWave[triggerIdx + i] * (H * 0.42);
+        if (i === 0) liveCtx.moveTo(x, y);
+        else liveCtx.lineTo(x, y);
+      }
+      liveCtx.stroke();
+    }
+
+    function runLiveRenderLoop() {
+      if (liveAnimId) cancelAnimationFrame(liveAnimId);
+
+      function frame() {
+        liveAnimId = requestAnimationFrame(frame);
+        if (activeAppMode !== 'live') return;
+
+        if (syncCanvasSize(liveCanvas)) {
+          liveCtx.fillStyle = '#090B0F';
+          liveCtx.fillRect(0, 0, liveCanvas.width, liveCanvas.height);
+          specColImage = liveCtx.createImageData(2, Math.max(1, liveCanvas.height));
+        }
+
+        const W = liveCanvas.width;
+        const H = liveCanvas.height;
+        if (!W || !H) return;
+
+        if (visMode === 'topo') drawTopographyFrame(W, H, isRunning);
+        else if (visMode === 'spec') drawSpectrumFrame(W, H, isRunning);
+        else drawWaveFrame(W, H, isRunning);
+      }
+
+      frame();
     }
 
     // =========================================================================
-    // 6. MODE 1: LIVE STREAM LIFECYCLE & CONTROLS
+    // 7. MODE 1: LIVE CHAMBER LIFECYCLE
     // =========================================================================
     async function startStream() {
       if (isRunning || isStarting) return;
       isStarting = true;
       startBtn.disabled = true;
-      streamDot.className = 'dot loading';
-      engineStatus.textContent = 'Loading Model...';
-      addActivity('Loading DeepFilterNet3 WebAssembly engine...');
+      standbyStartBtn.disabled = true;
+      statusDot.className = 'status-dot loading';
+      engineStatus.textContent = 'Loading WASM...';
+      liveStateTag.textContent = 'Loading Model';
+      addTrace('Initializing 48 kHz AudioWorklet & DeepFilterNet3...');
 
       let workletUrl = null;
       try {
+        // Unlock AudioContext immediately while click/tap gesture is fresh
         audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE, latencyHint: 'interactive' });
-        const initialResumePromise = audioCtx.resume().catch(() => {});
+        const initialResume = audioCtx.resume().catch(() => {});
 
         const [stream, assets] = await Promise.all([
           navigator.mediaDevices.getUserMedia(buildMicConstraints(inputSelect.value)),
           loadEngineAssets(),
-          initialResumePromise
+          initialResume
         ]);
 
         mediaStream = stream;
@@ -1857,9 +2551,15 @@
           outputChannelCount: [1]
         });
 
-        analyserNode = audioCtx.createAnalyser();
-        analyserNode.fftSize = 1024;
-        analyserNode.smoothingTimeConstant = 0.68;
+        rawAnalyser = audioCtx.createAnalyser();
+        rawAnalyser.fftSize = 1024;
+        cleanAnalyser = audioCtx.createAnalyser();
+        cleanAnalyser.fftSize = 1024;
+        cleanAnalyser.smoothingTimeConstant = 0.7;
+
+        liveFreqBins = new Uint8Array(cleanAnalyser.frequencyBinCount);
+        liveRawWave = new Float32Array(rawAnalyser.fftSize);
+        liveCleanWave = new Float32Array(cleanAnalyser.fftSize);
 
         monitorGainNode = audioCtx.createGain();
         monitorGainNode.gain.value = monitorMuted ? 0.0 : 1.0;
@@ -1872,13 +2572,15 @@
             if (audioCtx && audioCtx.state === 'suspended') {
               try { await audioCtx.resume(); } catch (_) {}
             }
-            streamDot.className = 'dot live';
-            engineStatus.textContent = `Live · ${audioCtx.sampleRate / 1000} kHz`;
-            addActivity(`DeepFilterNet3 ready (${d.hopSize}-sample frames).`, 'good');
+            statusDot.className = 'status-dot live';
+            engineStatus.textContent = `Live · ${(audioCtx.sampleRate / 1000).toFixed(0)} kHz`;
+            liveStateTag.textContent = ancEnabled ? 'Voice Isolated' : 'Raw Passthrough';
+            addTrace(`DeepFilterNet3 ready (${d.hopSize}-sample frames).`, 'good');
           } else if (d.type === 'WASM_ERROR') {
-            streamDot.className = 'dot live';
-            engineStatus.textContent = `Bypass Only · ${audioCtx.sampleRate / 1000} kHz`;
-            addActivity(`Engine error: ${d.message}`, 'warn');
+            statusDot.className = 'status-dot live';
+            engineStatus.textContent = 'Bypass Only';
+            liveStateTag.textContent = 'WASM Error';
+            addTrace(`WASM error: ${d.message}`, 'warn');
           } else if (d.type === 'AUDIO_HOP') {
             const rawHop = d.raw;
             const cleanHop = d.clean;
@@ -1920,66 +2622,54 @@
           }
         };
 
+        sourceNode.connect(rawAnalyser);
         sourceNode.connect(workletNode);
-        workletNode.connect(analyserNode);
-        analyserNode.connect(monitorGainNode);
+        workletNode.connect(cleanAnalyser);
+        cleanAnalyser.connect(monitorGainNode);
         monitorGainNode.connect(audioCtx.destination);
 
-        if (audioCtx.state === 'suspended') {
-          await audioCtx.resume();
-        }
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
 
         const wasmCopy = assets.wasmBytes.slice(0);
         const modelCopy = assets.modelBytes.slice(0);
         workletNode.port.postMessage(
-          {
-            type: 'INIT_WASM',
-            dfJsCode: assets.dfJsCode,
-            wasmBytes: wasmCopy,
-            modelBytes: modelCopy
-          },
+          { type: 'INIT_WASM', dfJsCode: assets.dfJsCode, wasmBytes: wasmCopy, modelBytes: modelCopy },
           [wasmCopy, modelCopy]
         );
 
         workletNode.port.postMessage({ type: 'SET_GAIN', gain: parseFloat(gainSlider.value) });
         workletNode.port.postMessage({ type: 'SET_BLEND', blend: parseInt(blendSlider.value, 10) / 100 });
+        workletNode.port.postMessage({ type: 'SET_NOISE', mode: testNoiseMode });
 
         isRunning = true;
         isStarting = false;
         startBtn.disabled = false;
+        standbyStartBtn.disabled = false;
         startBtn.classList.add('active');
-        startBtnText.textContent = 'Stop Audio';
-
+        startBtnText.textContent = 'Stop Live Audio';
+        liveStandbyOverlay.classList.add('dismissed');
         liveRecBtn.disabled = false;
         exportBufBtn.disabled = false;
 
-        startVisualizer();
+        clearLiveCanvas();
       } catch (err) {
         if (workletUrl) URL.revokeObjectURL(workletUrl);
-        if (mediaStream) {
-          mediaStream.getTracks().forEach(t => t.stop());
-          mediaStream = null;
-        }
-        if (audioCtx) {
-          try { await audioCtx.close(); } catch (_) {}
-          audioCtx = null;
-        }
+        if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+        if (audioCtx) { try { await audioCtx.close(); } catch (_) {} audioCtx = null; }
         isStarting = false;
         isRunning = false;
         startBtn.disabled = false;
-        streamDot.className = 'dot';
-        engineStatus.textContent = 'Ready';
-        addActivity(`Startup failed: ${err.message}`, 'warn');
+        standbyStartBtn.disabled = false;
+        statusDot.className = 'status-dot';
+        engineStatus.textContent = 'Standby';
+        liveStateTag.textContent = 'Standby';
+        addTrace(`Start failed: ${err.message}`, 'warn');
       }
     }
 
     async function stopStream() {
       if (!isRunning && !isStarting) return;
       if (isRecordingLive) toggleLiveRecording();
-      if (animFrameId) {
-        cancelAnimationFrame(animFrameId);
-        animFrameId = null;
-      }
 
       if (workletNode) {
         try {
@@ -1989,43 +2679,32 @@
         } catch (_) {}
         workletNode = null;
       }
-      if (sourceNode) {
-        try { sourceNode.disconnect(); } catch (_) {}
-        sourceNode = null;
-      }
-      if (analyserNode) {
-        try { analyserNode.disconnect(); } catch (_) {}
-        analyserNode = null;
-      }
-      if (monitorGainNode) {
-        try { monitorGainNode.disconnect(); } catch (_) {}
-        monitorGainNode = null;
-      }
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(t => t.stop());
-        mediaStream = null;
-      }
-      if (audioCtx) {
-        try { await audioCtx.close(); } catch (_) {}
-        audioCtx = null;
-      }
+      if (sourceNode) { try { sourceNode.disconnect(); } catch (_) {} sourceNode = null; }
+      if (rawAnalyser) { try { rawAnalyser.disconnect(); } catch (_) {} rawAnalyser = null; }
+      if (cleanAnalyser) { try { cleanAnalyser.disconnect(); } catch (_) {} cleanAnalyser = null; }
+      if (monitorGainNode) { try { monitorGainNode.disconnect(); } catch (_) {} monitorGainNode = null; }
+      if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+      if (audioCtx) { try { await audioCtx.close(); } catch (_) {} audioCtx = null; }
 
       isRunning = false;
       isStarting = false;
       wasmLoaded = false;
       ancEnabled = false;
-      streamDot.className = 'dot';
-      engineStatus.textContent = 'Ready';
-      startBtn.classList.remove('active');
-      startBtnText.textContent = 'Start Audio';
 
+      statusDot.className = 'status-dot';
+      engineStatus.textContent = 'Standby';
+      liveStateTag.textContent = 'Standby';
+      liveStateTag.className = 'chamber-state-tag';
+
+      startBtn.classList.remove('active');
+      startBtnText.textContent = 'Start Live Audio';
       toggleAncBtn.disabled = true;
       toggleAncBtn.classList.remove('active');
+      ancBtnText.textContent = 'Isolate Voice';
       liveRecBtn.disabled = true;
       exportBufBtn.disabled = true;
+      liveStandbyOverlay.classList.remove('dismissed');
 
-      ancBadge.textContent = 'Off — Raw Mic';
-      ancBadge.className = 'mode-status off';
       inBar.style.width = '0%';
       outBar.style.width = '0%';
       inDbText.textContent = '-inf dB';
@@ -2033,29 +2712,21 @@
       latencyVal.textContent = '0.0 ms';
       attenVal.textContent = '0.0 dB';
 
-      addActivity('Audio stopped.');
+      addTrace('Live stream stopped.');
     }
 
     function toggleAnc() {
       if (!isRunning || !wasmLoaded || !workletNode) return;
-      if (audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
       ancEnabled = !ancEnabled;
       workletNode.port.postMessage({ type: 'SET_ANC', enabled: ancEnabled });
-      playCueBeep(ancEnabled ? 880 : 350);
+      playCueChime(ancEnabled ? 880 : 360);
 
-      if (ancEnabled) {
-        ancBadge.textContent = 'Active — Voice Isolated';
-        ancBadge.className = 'mode-status on';
-        toggleAncBtn.classList.add('active');
-        addActivity('Noise cancellation turned on.', 'good');
-      } else {
-        ancBadge.textContent = 'Off — Raw Mic';
-        ancBadge.className = 'mode-status off';
-        toggleAncBtn.classList.remove('active');
-        addActivity('Noise cancellation turned off.');
-      }
+      toggleAncBtn.classList.toggle('active', ancEnabled);
+      ancBtnText.textContent = ancEnabled ? 'Voice Isolated' : 'Isolate Voice';
+      liveStateTag.textContent = ancEnabled ? 'Voice Isolated' : 'Raw Passthrough';
+      liveStateTag.className = ancEnabled ? 'chamber-state-tag isolated' : 'chamber-state-tag';
+      addTrace(ancEnabled ? 'Neural voice isolation engaged.' : 'Bypassed to raw microphone.', ancEnabled ? 'good' : '');
     }
 
     function toggleLiveRecording() {
@@ -2064,21 +2735,19 @@
         liveRawChunks = [];
         liveCleanChunks = [];
         isRecordingLive = true;
-        playCueBeep(1200, 0.08);
-        recDot.classList.add('recording');
-        recStatusText.textContent = 'Recording';
-        liveRecBtn.classList.add('active');
-        liveRecText.textContent = 'Stop & Save Recording';
-        addActivity('Recording raw and cleaned audio.');
+        playCueChime(1180, 0.08);
+        statusDot.className = 'status-dot rec';
+        liveRecBtn.classList.add('rec-active');
+        liveRecText.textContent = 'Stop & Save';
+        addTrace('Recording raw + isolated streams...');
       } else {
         isRecordingLive = false;
-        playCueBeep(600, 0.08);
-        recDot.classList.remove('recording');
-        recStatusText.textContent = 'Not Recording';
-        liveRecBtn.classList.remove('active');
-        liveRecText.textContent = 'Record Audio';
+        playCueChime(580, 0.08);
+        statusDot.className = 'status-dot live';
+        liveRecBtn.classList.remove('rec-active');
+        liveRecText.textContent = 'Record';
 
-        const totalLen = liveRawChunks.reduce((acc, c) => acc + c.length, 0);
+        const totalLen = liveRawChunks.reduce((a, c) => a + c.length, 0);
         const rawMerged = new Float32Array(totalLen);
         const cleanMerged = new Float32Array(totalLen);
         let offset = 0;
@@ -2091,8 +2760,8 @@
         liveCleanChunks = [];
 
         triggerDownload(encodeWavFile(rawMerged, SAMPLE_RATE), 'captured_raw.wav');
-        triggerDownload(encodeWavFile(cleanMerged, SAMPLE_RATE), 'captured_cleaned.wav');
-        addActivity(`Saved ${(totalLen / SAMPLE_RATE).toFixed(1)}s recording (.wav).`, 'good');
+        triggerDownload(encodeWavFile(cleanMerged, SAMPLE_RATE), 'captured_isolated.wav');
+        addTrace(`Exported ${(totalLen / SAMPLE_RATE).toFixed(1)}s WAV pair.`, 'good');
       }
     }
 
@@ -2100,17 +2769,16 @@
       if (!isRunning) return;
       const unrolledRaw = new Float32Array(HISTORY_SAMPLES);
       const unrolledClean = new Float32Array(HISTORY_SAMPLES);
-
       const tailLen = HISTORY_SAMPLES - historyWriteIdx;
+
       unrolledRaw.set(rawHistoryBuf.subarray(historyWriteIdx), 0);
       unrolledRaw.set(rawHistoryBuf.subarray(0, historyWriteIdx), tailLen);
-
       unrolledClean.set(cleanHistoryBuf.subarray(historyWriteIdx), 0);
       unrolledClean.set(cleanHistoryBuf.subarray(0, historyWriteIdx), tailLen);
 
-      triggerDownload(encodeWavFile(unrolledRaw, SAMPLE_RATE), 'demo_raw.wav');
-      triggerDownload(encodeWavFile(unrolledClean, SAMPLE_RATE), 'demo_cleaned.wav');
-      addActivity('Saved last 10 seconds (raw & cleaned).', 'good');
+      triggerDownload(encodeWavFile(unrolledRaw, SAMPLE_RATE), 'replay_10s_raw.wav');
+      triggerDownload(encodeWavFile(unrolledClean, SAMPLE_RATE), 'replay_10s_isolated.wav');
+      addTrace('Exported 10-second replay buffer.', 'good');
     }
 
     function toggleMonitorMute() {
@@ -2118,45 +2786,14 @@
       if (monitorGainNode && audioCtx) {
         monitorGainNode.gain.setValueAtTime(monitorMuted ? 0.0 : 1.0, audioCtx.currentTime);
       }
-      monitorValText.textContent = monitorMuted ? 'Muted' : 'On';
-      muteBtnLabel.textContent = monitorMuted ? 'Unmute Playback' : 'Mute Playback';
-      addActivity(monitorMuted ? 'Headphone playback muted.' : 'Headphone playback unmuted.');
+      muteBtnLabel.textContent = monitorMuted ? 'Muted' : 'Monitor On';
+      speakerWaves.style.opacity = monitorMuted ? '0.2' : '1';
+      addTrace(monitorMuted ? 'Headphone monitoring muted.' : 'Headphone monitoring unmuted.');
     }
 
     // =========================================================================
-    // 7. MODE 2: SUPERIOR AUDIO PROCESSING (BATCH BENCHMARK & SPECTROGRAM)
+    // 8. MODE 2: BATCH LAB (STFT SPECTROGRAMS + SPLIT CURTAIN + GAPLESS A/B)
     // =========================================================================
-    const INFERNO_LUT = (() => {
-      const stops = [
-        [0.00, [0, 0, 4]],
-        [0.14, [27, 12, 65]],
-        [0.28, [74, 12, 107]],
-        [0.43, [120, 28, 109]],
-        [0.57, [165, 44, 96]],
-        [0.71, [207, 68, 70]],
-        [0.85, [237, 105, 37]],
-        [0.93, [251, 155, 6]],
-        [1.00, [252, 255, 164]]
-      ];
-      const lut = new Uint8ClampedArray(256 * 3);
-      for (let i = 0; i < 256; i++) {
-        const t = i / 255;
-        let s0 = stops[0], s1 = stops[stops.length - 1];
-        for (let k = 0; k < stops.length - 1; k++) {
-          if (t >= stops[k][0] && t <= stops[k + 1][0]) {
-            s0 = stops[k];
-            s1 = stops[k + 1];
-            break;
-          }
-        }
-        const f = s1[0] === s0[0] ? 0 : (t - s0[0]) / (s1[0] - s0[0]);
-        lut[i * 3]     = Math.round(s0[1][0] + (s1[1][0] - s0[1][0]) * f);
-        lut[i * 3 + 1] = Math.round(s0[1][1] + (s1[1][1] - s0[1][1]) * f);
-        lut[i * 3 + 2] = Math.round(s0[1][2] + (s1[1][2] - s0[1][2]) * f);
-      }
-      return lut;
-    })();
-
     const FFT_N = 1024;
     const HANN_WIN = new Float32Array(FFT_N);
     const FFT_COS = new Float32Array(FFT_N / 2);
@@ -2166,10 +2803,7 @@
     for (let i = 0; i < FFT_N; i++) {
       HANN_WIN[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (FFT_N - 1)));
       let x = i, r = 0;
-      for (let b = 0; b < 10; b++) {
-        r = (r << 1) | (x & 1);
-        x >>= 1;
-      }
+      for (let b = 0; b < 10; b++) { r = (r << 1) | (x & 1); x >>= 1; }
       FFT_REV[i] = r;
     }
     for (let i = 0; i < FFT_N / 2; i++) {
@@ -2178,10 +2812,10 @@
       FFT_SIN[i] = Math.sin(ang);
     }
 
-    function renderInfernoSpectrogram(targetCanvas, samples) {
+    function renderSpectrogramToCanvas(targetCanvas, samples, W, H) {
+      targetCanvas.width = W;
+      targetCanvas.height = H;
       const c = targetCanvas.getContext('2d');
-      const W = targetCanvas.width;
-      const H = targetCanvas.height;
       const hop = 512;
       const numFrames = Math.max(1, Math.floor((samples.length - FFT_N) / hop) + 1);
       const halfBins = FFT_N >> 1;
@@ -2189,8 +2823,8 @@
       const re = new Float32Array(FFT_N);
       const im = new Float32Array(FFT_N);
       const magDb = new Float32Array(numFrames * halfBins);
-
       const winScale = 2.0 / FFT_N;
+
       for (let f = 0; f < numFrames; f++) {
         const start = f * hop;
         for (let i = 0; i < FFT_N; i++) {
@@ -2199,7 +2833,6 @@
           re[i] = s * HANN_WIN[rev];
           im[i] = 0;
         }
-
         for (let size = 2; size <= FFT_N; size <<= 1) {
           const half = size >> 1;
           const step = FFT_N / size;
@@ -2218,19 +2851,17 @@
             }
           }
         }
-
         const base = f * halfBins;
         for (let b = 0; b < halfBins; b++) {
           const r = re[b] * winScale;
           const m = im[b] * winScale;
-          const pwr = r * r + m * m + 1e-12;
-          magDb[base + b] = 10 * Math.log10(pwr);
+          magDb[base + b] = 10 * Math.log10(r * r + m * m + 1e-12);
         }
       }
 
       const img = c.createImageData(W, H);
       const data = img.data;
-      const minDb = -95.0;
+      const minDb = -94.0;
       const maxDb = -18.0;
       const invRange = 1.0 / (maxDb - minDb);
 
@@ -2243,7 +2874,7 @@
           const norm = Math.max(0, Math.min(1, (db - minDb) * invRange));
           const lutIdx = ((norm * 255) | 0) * 3;
           const px = (y * W + x) * 4;
-          data[px]     = INFERNO_LUT[lutIdx];
+          data[px] = INFERNO_LUT[lutIdx];
           data[px + 1] = INFERNO_LUT[lutIdx + 1];
           data[px + 2] = INFERNO_LUT[lutIdx + 2];
           data[px + 3] = 255;
@@ -2251,21 +2882,84 @@
       }
       c.putImageData(img, 0, 0);
 
-      c.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      // Subtle architectural frequency grid lines
+      c.strokeStyle = 'rgba(241, 243, 240, 0.1)';
       c.lineWidth = 1;
       for (let g = 1; g <= 3; g++) {
         const gy = Math.round((H * g) / 4);
-        c.beginPath();
-        c.moveTo(0, gy);
-        c.lineTo(W, gy);
-        c.stroke();
+        c.beginPath(); c.moveTo(0, gy); c.lineTo(W, gy); c.stroke();
+      }
+    }
+
+    function compositeSplitCurtain() {
+      if (!batchRawAudio || !batchCleanAudio) return;
+      syncCanvasSize(batchSplitCanvas);
+      const W = batchSplitCanvas.width;
+      const H = batchSplitCanvas.height;
+      const c = batchSplitCanvas.getContext('2d');
+      const splitX = Math.round(W * splitRatio);
+
+      c.clearRect(0, 0, W, H);
+      // Left side: Raw Corrupted
+      if (splitX > 0) {
+        c.save();
+        c.beginPath(); c.rect(0, 0, splitX, H); c.clip();
+        c.drawImage(offRawCanvas, 0, 0, W, H);
+        c.restore();
+      }
+      // Right side: AI Isolated
+      if (splitX < W) {
+        c.save();
+        c.beginPath(); c.rect(splitX, 0, W - splitX, H); c.clip();
+        c.drawImage(offCleanCanvas, 0, 0, W, H);
+        c.restore();
+      }
+
+      curtainDivider.style.left = (splitRatio * 100).toFixed(2) + '%';
+      curtainHandle.setAttribute('aria-valuenow', Math.round(splitRatio * 100));
+    }
+
+    function renderAllBatchVisuals() {
+      if (!batchRawAudio || !batchCleanAudio) return;
+      const W = 960;
+      const H = 360;
+      renderSpectrogramToCanvas(offRawCanvas, batchRawAudio, W, H);
+      renderSpectrogramToCanvas(offCleanCanvas, batchCleanAudio, W, H);
+
+      compositeSplitCurtain();
+
+      // Update stacked canvases too
+      syncCanvasSize(batchRawCanvas);
+      syncCanvasSize(batchCleanCanvas);
+      batchRawCanvas.getContext('2d').drawImage(offRawCanvas, 0, 0, batchRawCanvas.width, batchRawCanvas.height);
+      batchCleanCanvas.getContext('2d').drawImage(offCleanCanvas, 0, 0, batchCleanCanvas.width, batchCleanCanvas.height);
+    }
+
+    function setBatchViewMode(mode) {
+      batchViewMode = mode;
+      batchViewSplitBtn.classList.toggle('active', mode === 'split');
+      batchViewSplitBtn.setAttribute('aria-selected', mode === 'split');
+      batchViewStackBtn.classList.toggle('active', mode === 'stack');
+      batchViewStackBtn.setAttribute('aria-selected', mode === 'stack');
+
+      splitViewLayer.classList.toggle('hidden', mode !== 'split');
+      stackedViewLayer.classList.toggle('hidden', mode !== 'stack');
+
+      if (batchRawAudio && batchCleanAudio) {
+        if (mode === 'split') {
+          compositeSplitCurtain();
+        } else {
+          syncCanvasSize(batchRawCanvas);
+          syncCanvasSize(batchCleanCanvas);
+          batchRawCanvas.getContext('2d').drawImage(offRawCanvas, 0, 0, batchRawCanvas.width, batchRawCanvas.height);
+          batchCleanCanvas.getContext('2d').drawImage(offCleanCanvas, 0, 0, batchCleanCanvas.width, batchCleanCanvas.height);
+        }
       }
     }
 
     function buildBatchOutputBuffer(rawSamples, pureAiSamples, gain) {
       const len = rawSamples.length;
       const out = new Float32Array(len);
-
       let aiPeak = 0;
       for (let i = 0; i < len; i++) {
         const a = Math.abs(pureAiSamples[i]);
@@ -2275,131 +2969,146 @@
       const totalGain = gain * autoBoost;
 
       for (let i = 0; i < len; i++) {
-        const mixed = (pureAiSamples[i] * 0.92 + rawSamples[i] * 0.08) * totalGain;
-        let s = Math.tanh(mixed);
+        let s = Math.tanh((pureAiSamples[i] * 0.92 + rawSamples[i] * 0.08) * totalGain);
         if (s > 0.98) s = 0.98;
-        if (s < -0.98) s = -0.98;
+        else if (s < -0.98) s = -0.98;
         out[i] = s;
       }
       return out;
-    }
-
-    function stopBatchPlayback() {
-      if (batchPlayheadAnimId) {
-        cancelAnimationFrame(batchPlayheadAnimId);
-        batchPlayheadAnimId = null;
-      }
-      if (batchPlaybackSource) {
-        try { batchPlaybackSource.stop(); } catch (_) {}
-        batchPlaybackSource = null;
-      }
-      if (batchPlaybackCtx) {
-        try { batchPlaybackCtx.close(); } catch (_) {}
-        batchPlaybackCtx = null;
-      }
-      activeBatchPlaybackType = null;
-      rawPlayhead.style.display = 'none';
-      cleanPlayhead.style.display = 'none';
-      batchPlayRawBtn.classList.remove('active');
-      batchPlayCleanBtn.classList.remove('active');
-      batchStopPlayBtn.disabled = true;
-    }
-
-    async function playBatchBuffer(type) {
-      const samples = type === 'raw' ? batchRawAudio : batchCleanAudio;
-      if (!samples) return;
-
-      stopBatchPlayback();
-      activeBatchPlaybackType = type;
-
-      batchPlaybackCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
-      if (outputSelect.value && typeof batchPlaybackCtx.setSinkId === 'function') {
-        try { await batchPlaybackCtx.setSinkId(outputSelect.value); } catch (_) {}
-      }
-      if (batchPlaybackCtx.state === 'suspended') {
-        await batchPlaybackCtx.resume();
-      }
-
-      const audioBuf = batchPlaybackCtx.createBuffer(1, samples.length, SAMPLE_RATE);
-      audioBuf.copyToChannel(samples, 0);
-
-      const src = batchPlaybackCtx.createBufferSource();
-      src.buffer = audioBuf;
-      src.connect(batchPlaybackCtx.destination);
-      src.onended = () => {
-        if (batchPlaybackSource === src) stopBatchPlayback();
-      };
-
-      batchPlaybackSource = src;
-      batchPlaybackDuration = audioBuf.duration;
-      batchPlaybackStartTime = batchPlaybackCtx.currentTime;
-
-      rawPlayhead.style.display = 'block';
-      cleanPlayhead.style.display = 'block';
-      batchStopPlayBtn.disabled = false;
-      if (type === 'raw') batchPlayRawBtn.classList.add('active');
-      else batchPlayCleanBtn.classList.add('active');
-
-      src.start();
-      addActivity(`Playing ${type === 'raw' ? 'raw corrupted input' : 'DeepFilterNet3 cleaned output'} (${batchPlaybackDuration.toFixed(1)}s).`);
-
-      function updatePlayhead() {
-        if (!batchPlaybackCtx || !batchPlaybackSource) return;
-        const elapsed = batchPlaybackCtx.currentTime - batchPlaybackStartTime;
-        const pct = Math.min(100, Math.max(0, (elapsed / batchPlaybackDuration) * 100));
-        rawPlayhead.style.left = pct + '%';
-        cleanPlayhead.style.left = pct + '%';
-        if (pct < 100) {
-          batchPlayheadAnimId = requestAnimationFrame(updatePlayhead);
-        }
-      }
-      updatePlayhead();
     }
 
     function computeNoiseFloorDropDb(rawSamples, cleanSamples) {
       const frameLen = 480;
       const nFrames = Math.floor(rawSamples.length / frameLen);
       if (nFrames < 5) return 0;
-
       const rawRms = new Float32Array(nFrames);
       const cleanRms = new Float32Array(nFrames);
-
       for (let f = 0; f < nFrames; f++) {
         let sR = 0, sC = 0;
         const off = f * frameLen;
         for (let i = 0; i < frameLen; i++) {
           const r = rawSamples[off + i];
           const c = cleanSamples[off + i];
-          sR += r * r;
-          sC += c * c;
+          sR += r * r; sC += c * c;
         }
         rawRms[f] = Math.sqrt(sR / frameLen);
         cleanRms[f] = Math.sqrt(sC / frameLen);
       }
-
       rawRms.sort();
       cleanRms.sort();
       const idx = Math.floor(nFrames * 0.15);
-      const rFloor = rawRms[idx] + 1e-6;
-      const cFloor = cleanRms[idx] + 1e-6;
-      return Math.max(0, 20 * Math.log10(rFloor / cFloor));
+      return Math.max(0, 20 * Math.log10((rawRms[idx] + 1e-6) / (cleanRms[idx] + 1e-6)));
+    }
+
+    // Gapless Mid-Play A/B Switching + Tap-to-Seek
+    function stopBatchPlayback() {
+      if (batchPlayheadAnimId) { cancelAnimationFrame(batchPlayheadAnimId); batchPlayheadAnimId = null; }
+      if (batchSrcRaw) { try { batchSrcRaw.stop(); } catch (_) {} batchSrcRaw = null; }
+      if (batchSrcClean) { try { batchSrcClean.stop(); } catch (_) {} batchSrcClean = null; }
+      if (batchPlayCtx) { try { batchPlayCtx.close(); } catch (_) {} batchPlayCtx = null; }
+      batchGainRaw = null;
+      batchGainClean = null;
+      activeBatchChannel = null;
+      batchPlayhead.style.display = 'none';
+      batchPlayRawBtn.classList.remove('ab-raw-active');
+      batchPlayCleanBtn.classList.remove('ab-clean-active');
+      batchStopPlayBtn.disabled = true;
+    }
+
+    async function playOrSwitchBatch(channel, startOffsetSec = null) {
+      if (!batchRawAudio || !batchCleanAudio) return;
+
+      // Seamless 15ms crossfade if already playing and not seeking
+      if (batchPlayCtx && batchGainRaw && batchGainClean && startOffsetSec === null) {
+        const now = batchPlayCtx.currentTime;
+        batchGainRaw.gain.cancelScheduledValues(now);
+        batchGainClean.gain.cancelScheduledValues(now);
+        batchGainRaw.gain.setValueAtTime(batchGainRaw.gain.value, now);
+        batchGainClean.gain.setValueAtTime(batchGainClean.gain.value, now);
+        batchGainRaw.gain.linearRampToValueAtTime(channel === 'raw' ? 1 : 0, now + 0.015);
+        batchGainClean.gain.linearRampToValueAtTime(channel === 'clean' ? 1 : 0, now + 0.015);
+
+        activeBatchChannel = channel;
+        batchPlayRawBtn.classList.toggle('ab-raw-active', channel === 'raw');
+        batchPlayCleanBtn.classList.toggle('ab-clean-active', channel === 'clean');
+        addTrace(`Switched A/B monitor -> ${channel === 'raw' ? 'Raw Input' : 'AI Isolated'}.`);
+        return;
+      }
+
+      stopBatchPlayback();
+      const offset = startOffsetSec !== null ? Math.max(0, startOffsetSec) : 0;
+
+      batchPlayCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
+      if (outputSelect.value && typeof batchPlayCtx.setSinkId === 'function') {
+        try { await batchPlayCtx.setSinkId(outputSelect.value); } catch (_) {}
+      }
+      if (batchPlayCtx.state === 'suspended') await batchPlayCtx.resume();
+
+      const rawBuf = batchPlayCtx.createBuffer(1, batchRawAudio.length, SAMPLE_RATE);
+      rawBuf.copyToChannel(batchRawAudio, 0);
+      const cleanBuf = batchPlayCtx.createBuffer(1, batchCleanAudio.length, SAMPLE_RATE);
+      cleanBuf.copyToChannel(batchCleanAudio, 0);
+
+      batchSrcRaw = batchPlayCtx.createBufferSource();
+      batchSrcClean = batchPlayCtx.createBufferSource();
+      batchSrcRaw.buffer = rawBuf;
+      batchSrcClean.buffer = cleanBuf;
+
+      batchGainRaw = batchPlayCtx.createGain();
+      batchGainClean = batchPlayCtx.createGain();
+      batchGainRaw.gain.value = channel === 'raw' ? 1 : 0;
+      batchGainClean.gain.value = channel === 'clean' ? 1 : 0;
+
+      batchSrcRaw.connect(batchGainRaw).connect(batchPlayCtx.destination);
+      batchSrcClean.connect(batchGainClean).connect(batchPlayCtx.destination);
+
+      const thisSrc = batchSrcRaw;
+      batchSrcRaw.onended = () => { if (batchSrcRaw === thisSrc) stopBatchPlayback(); };
+
+      batchPlayDuration = rawBuf.duration;
+      batchPlayOffsetSec = Math.min(offset, Math.max(0, batchPlayDuration - 0.05));
+      batchPlayStartCtxTime = batchPlayCtx.currentTime;
+      activeBatchChannel = channel;
+
+      batchPlayhead.style.display = 'block';
+      batchStopPlayBtn.disabled = false;
+      batchPlayRawBtn.classList.toggle('ab-raw-active', channel === 'raw');
+      batchPlayCleanBtn.classList.toggle('ab-clean-active', channel === 'clean');
+
+      const tStart = batchPlayCtx.currentTime + 0.01;
+      batchPlayStartCtxTime = tStart;
+      batchSrcRaw.start(tStart, batchPlayOffsetSec);
+      batchSrcClean.start(tStart, batchPlayOffsetSec);
+
+      addTrace(`Playing ${channel === 'raw' ? 'Raw Input' : 'AI Isolated'} (tap 1/2 to A/B live).`);
+
+      function tickPlayhead() {
+        if (!batchPlayCtx || !batchSrcRaw) return;
+        const pos = batchPlayOffsetSec + Math.max(0, batchPlayCtx.currentTime - batchPlayStartCtxTime);
+        const pct = Math.min(100, (pos / batchPlayDuration) * 100);
+        batchPlayhead.style.left = pct.toFixed(2) + '%';
+        if (pct < 100) batchPlayheadAnimId = requestAnimationFrame(tickPlayhead);
+      }
+      tickPlayhead();
     }
 
     async function runBatchEnhancement(rawSamples) {
       isBatchProcessing = true;
       batchRecBtn.disabled = true;
+      batchOverlayRecBtn.disabled = true;
       batchUploadBtn.disabled = true;
       batchPlayRawBtn.disabled = true;
       batchPlayCleanBtn.disabled = true;
       batchDownloadBtn.disabled = true;
 
-      batchBadge.textContent = 'Processing · DeepFilterNet3 STFT';
-      batchBadge.className = 'mode-status off';
-      streamDot.className = 'dot loading';
-      engineStatus.textContent = 'Batch Processing...';
-      batchMeterLabel.textContent = 'DeepFilterNet3 Offline STFT Pass';
-      batchProgressText.textContent = 'Loading Worker...';
-      batchProgressBar.style.width = '5%';
+      statusDot.className = 'status-dot loading';
+      engineStatus.textContent = 'Processing STFT...';
+      batchStateTag.textContent = 'Enhancing';
+      batchStateTag.className = 'chamber-state-tag';
+      batchStageLabel.textContent = 'DeepFilterNet3 Worker Pass';
+      batchProgressText.textContent = 'Starting worker...';
+      batchProgressFill.style.width = '6%';
+      batchSubBar.style.width = '6%';
 
       try {
         const assets = await loadEngineAssets();
@@ -2409,7 +3118,8 @@
           worker.onmessage = (ev) => {
             const msg = ev.data;
             if (msg.type === 'PROGRESS') {
-              batchProgressBar.style.width = msg.pct + '%';
+              batchProgressFill.style.width = msg.pct + '%';
+              batchSubBar.style.width = msg.pct + '%';
               batchProgressText.textContent = `${msg.pct}%`;
             } else if (msg.type === 'DONE') {
               resolve(msg);
@@ -2417,69 +3127,59 @@
               reject(new Error(msg.message));
             }
           };
-          worker.onerror = (err) => reject(new Error(err.message || 'Batch worker crashed.'));
+          worker.onerror = (err) => reject(new Error(err.message || 'Batch worker error.'));
 
           const wasmCopy = assets.wasmBytes.slice(0);
           const modelCopy = assets.modelBytes.slice(0);
           const rawCopy = new Float32Array(rawSamples);
-
           worker.postMessage(
-            {
-              type: 'RUN_BATCH',
-              dfJsCode: assets.dfJsCode,
-              wasmBytes: wasmCopy,
-              modelBytes: modelCopy,
-              rawSamples: rawCopy
-            },
+            { type: 'RUN_BATCH', dfJsCode: assets.dfJsCode, wasmBytes: wasmCopy, modelBytes: modelCopy, rawSamples: rawCopy },
             [wasmCopy, modelCopy, rawCopy.buffer]
           );
         });
 
         batchRawAudio = result.rawSamples;
         batchPureAiAudio = result.pureAiSamples;
-        batchCleanAudio = buildBatchOutputBuffer(
-          batchRawAudio,
-          batchPureAiAudio,
-          parseFloat(batchGainSlider.value)
-        );
+        batchCleanAudio = buildBatchOutputBuffer(batchRawAudio, batchPureAiAudio, parseFloat(batchGainSlider.value));
 
         const elapsedMs = result.elapsedMs;
-        const durationSec = batchRawAudio.length / SAMPLE_RATE;
-        const rtFactor = (durationSec * 1000) / Math.max(1, elapsedMs);
+        const durSec = batchRawAudio.length / SAMPLE_RATE;
+        const rtFactor = (durSec * 1000) / Math.max(1, elapsedMs);
 
+        batchStandbyOverlay.classList.add('dismissed');
         batchProgressText.textContent = 'Rendering spectrograms...';
         await new Promise(r => setTimeout(r, 0));
 
-        renderInfernoSpectrogram(batchRawCanvas, batchRawAudio);
-        renderInfernoSpectrogram(batchCleanCanvas, batchCleanAudio);
+        renderAllBatchVisuals();
 
-        const floorDrop = computeNoiseFloorDropDb(batchRawAudio, batchCleanAudio);
-        batchDurVal.textContent = `${durationSec.toFixed(1)} sec`;
+        const dropDb = computeNoiseFloorDropDb(batchRawAudio, batchCleanAudio);
+        batchDurVal.textContent = `${durSec.toFixed(1)} s`;
         batchSpeedVal.textContent = `${rtFactor.toFixed(1)}× RT`;
-        batchSnrVal.textContent = `-${floorDrop.toFixed(1)} dB`;
-        rawAxisHint.textContent = `0 – 24 kHz · ${durationSec.toFixed(1)} s`;
+        batchSnrVal.textContent = `-${dropDb.toFixed(1)} dB`;
 
-        batchProgressBar.style.width = '100%';
-        batchProgressText.textContent = `Done (${elapsedMs.toFixed(0)} ms)`;
-        batchBadge.textContent = 'Ready — Compare Raw vs. Cleaned';
-        batchBadge.className = 'mode-status on';
-        streamDot.className = 'dot live';
-        engineStatus.textContent = 'Batch Ready · 48 kHz';
+        batchProgressFill.style.width = '100%';
+        batchSubBar.style.width = '100%';
+        batchStageLabel.textContent = 'Ready — Drag Curtain or Tap to Seek';
+        batchProgressText.textContent = `${elapsedMs.toFixed(0)} ms`;
+        batchStateTag.textContent = 'Isolated · Ready';
+        batchStateTag.className = 'chamber-state-tag isolated';
+        statusDot.className = 'status-dot live';
+        engineStatus.textContent = 'Batch Ready';
 
         batchPlayRawBtn.disabled = false;
         batchPlayCleanBtn.disabled = false;
         batchDownloadBtn.disabled = false;
-        addActivity(`Batch enhanced ${durationSec.toFixed(1)}s clip in ${elapsedMs.toFixed(0)}ms (${rtFactor.toFixed(1)}× real-time).`, 'good');
+        addTrace(`Enhanced ${durSec.toFixed(1)}s clip in ${elapsedMs.toFixed(0)}ms (${rtFactor.toFixed(1)}× real-time).`, 'good');
       } catch (err) {
-        batchBadge.textContent = 'Error';
-        batchBadge.className = 'mode-status off';
-        streamDot.className = 'dot';
-        engineStatus.textContent = 'Ready';
+        statusDot.className = 'status-dot';
+        engineStatus.textContent = 'Standby';
+        batchStateTag.textContent = 'Error';
         batchProgressText.textContent = 'Failed';
-        addActivity(`Batch processing failed: ${err.message}`, 'warn');
+        addTrace(`Batch error: ${err.message}`, 'warn');
       } finally {
         isBatchProcessing = false;
         batchRecBtn.disabled = false;
+        batchOverlayRecBtn.disabled = false;
         batchUploadBtn.disabled = false;
       }
     }
@@ -2494,25 +3194,22 @@
 
       isBatchRecording = true;
       batchRecBtn.disabled = true;
+      batchOverlayRecBtn.disabled = true;
       batchUploadBtn.disabled = true;
       batchPlayRawBtn.disabled = true;
       batchPlayCleanBtn.disabled = true;
       batchDownloadBtn.disabled = true;
 
-      batchBadge.textContent = `Recording ${durationSec}.0s...`;
-      batchBadge.className = 'mode-status rec';
-      recDot.classList.add('recording');
-      recStatusText.textContent = `Recording ${durationSec}s`;
-      batchMeterLabel.textContent = 'Microphone Capture Progress';
-      batchProgressBar.style.width = '0%';
-      addActivity(`Recording ${durationSec} seconds for batch DeepFilterNet3 processing...`);
+      statusDot.className = 'status-dot rec';
+      engineStatus.textContent = `Recording ${durationSec}s`;
+      batchStateTag.textContent = `Recording ${durationSec}.0 s`;
+      batchStateTag.className = 'chamber-state-tag recording';
+      batchStageLabel.textContent = 'Capturing 48 kHz Mono Microphone';
+      batchProgressFill.style.width = '0%';
+      batchSubBar.style.width = '0%';
+      addTrace(`Recording ${durationSec}s benchmark clip...`);
 
-      let capCtx = null;
-      let capStream = null;
-      let capWorkletUrl = null;
-      let capNode = null;
-      let capSource = null;
-
+      let capCtx = null, capStream = null, capUrl = null, capNode = null, capSrc = null;
       try {
         capCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
         const resumeP = capCtx.resume().catch(() => {});
@@ -2521,44 +3218,39 @@
         await populateDevices();
 
         const blob = new Blob([workletSource], { type: 'application/javascript' });
-        capWorkletUrl = URL.createObjectURL(blob);
-        await capCtx.audioWorklet.addModule(capWorkletUrl);
-        URL.revokeObjectURL(capWorkletUrl);
-        capWorkletUrl = null;
+        capUrl = URL.createObjectURL(blob);
+        await capCtx.audioWorklet.addModule(capUrl);
+        URL.revokeObjectURL(capUrl);
+        capUrl = null;
+        if (capCtx.state === 'suspended') await capCtx.resume();
 
-        if (capCtx.state === 'suspended') {
-          await capCtx.resume();
-        }
-
-        capSource = capCtx.createMediaStreamSource(capStream);
+        capSrc = capCtx.createMediaStreamSource(capStream);
         capNode = new AudioWorkletNode(capCtx, 'batch-capture-worklet', {
-          numberOfInputs: 1,
-          numberOfOutputs: 1,
-          outputChannelCount: [1]
+          numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1]
         });
 
         const captured = new Float32Array(targetSamples);
         let collected = 0;
-        let maxInputPeak = 0;
+        let maxPeak = 0;
 
         await new Promise((resolve) => {
           capNode.port.onmessage = (ev) => {
             if (!isBatchRecording) return;
             const chunk = ev.data;
-            const rem = targetSamples - collected;
-            const take = Math.min(chunk.length, rem);
+            const take = Math.min(chunk.length, targetSamples - collected);
             for (let i = 0; i < take; i++) {
               const s = chunk[i];
               const a = s < 0 ? -s : s;
-              if (a > maxInputPeak) maxInputPeak = a;
+              if (a > maxPeak) maxPeak = a;
               captured[collected + i] = s;
             }
             collected += take;
 
             const pct = Math.min(100, (collected / targetSamples) * 100);
-            const remSec = Math.max(0, (targetSamples - collected) / SAMPLE_RATE);
-            batchProgressBar.style.width = pct + '%';
-            batchProgressText.textContent = `${remSec.toFixed(1)}s left`;
+            const rem = Math.max(0, (targetSamples - collected) / SAMPLE_RATE);
+            batchProgressFill.style.width = pct + '%';
+            batchSubBar.style.width = pct + '%';
+            batchProgressText.textContent = `${rem.toFixed(1)} s left`;
 
             if (collected >= targetSamples) {
               isBatchRecording = false;
@@ -2566,39 +3258,35 @@
               resolve();
             }
           };
-
-          capSource.connect(capNode);
+          capSrc.connect(capNode);
           capNode.connect(capCtx.destination);
         });
 
         try { capNode.disconnect(); } catch (_) {}
-        try { capSource.disconnect(); } catch (_) {}
+        try { capSrc.disconnect(); } catch (_) {}
         capStream.getTracks().forEach(t => t.stop());
         await capCtx.close();
 
-        recDot.classList.remove('recording');
-        recStatusText.textContent = 'Not Recording';
-
-        if (maxInputPeak < 1e-5) {
-          addActivity('Warning: Captured microphone signal was silent (-inf dB). Check selected microphone.', 'warn');
+        if (maxPeak < 1e-5) {
+          addTrace('Captured signal was silent (-inf dB). Verify microphone input.', 'warn');
         } else {
-          const pkDb = (20 * Math.log10(maxInputPeak)).toFixed(1);
-          addActivity(`Captured ${durationSec}s (peak ${pkDb} dB). Running DeepFilterNet3...`);
+          addTrace(`Captured ${durationSec}s (peak ${(20 * Math.log10(maxPeak)).toFixed(1)} dB).`);
         }
 
         await runBatchEnhancement(captured);
       } catch (err) {
-        if (capWorkletUrl) URL.revokeObjectURL(capWorkletUrl);
+        if (capUrl) URL.revokeObjectURL(capUrl);
         if (capStream) capStream.getTracks().forEach(t => t.stop());
         if (capCtx) { try { await capCtx.close(); } catch (_) {} }
         isBatchRecording = false;
-        recDot.classList.remove('recording');
-        recStatusText.textContent = 'Not Recording';
+        statusDot.className = 'status-dot';
+        engineStatus.textContent = 'Standby';
+        batchStateTag.textContent = `Ready · ${durationSec}.0 s`;
+        batchStateTag.className = 'chamber-state-tag';
         batchRecBtn.disabled = false;
+        batchOverlayRecBtn.disabled = false;
         batchUploadBtn.disabled = false;
-        batchBadge.textContent = 'Idle';
-        batchBadge.className = 'mode-status off';
-        addActivity(`Capture failed: ${err.message}`, 'warn');
+        addTrace(`Capture failed: ${err.message}`, 'warn');
       }
     }
 
@@ -2608,10 +3296,10 @@
       if (isRunning) await stopStream();
 
       try {
-        batchProgressText.textContent = 'Decoding audio...';
-        const arrayBuf = await file.arrayBuffer();
+        batchProgressText.textContent = 'Decoding file...';
+        const buf = await file.arrayBuffer();
         const decodeCtx = new AudioContext();
-        const decoded = await decodeCtx.decodeAudioData(arrayBuf);
+        const decoded = await decodeCtx.decodeAudioData(buf);
         await decodeCtx.close();
 
         const outLen = Math.ceil(decoded.duration * SAMPLE_RATE);
@@ -2621,78 +3309,122 @@
         src.connect(offline.destination);
         src.start();
         const rendered = await offline.startRendering();
-        const mono48k = rendered.getChannelData(0).slice();
 
-        addActivity(`Loaded "${file.name}" (${decoded.duration.toFixed(1)}s -> 48 kHz mono).`);
-        await runBatchEnhancement(mono48k);
+        addTrace(`Decoded "${file.name}" (${decoded.duration.toFixed(1)}s -> 48 kHz mono).`);
+        await runBatchEnhancement(rendered.getChannelData(0).slice());
       } catch (err) {
-        addActivity(`Could not decode file: ${err.message}`, 'warn');
+        addTrace(`Decode failed: ${err.message}`, 'warn');
       }
     }
 
-    function downloadBatchWavPair() {
-      if (!batchRawAudio || !batchCleanAudio) return;
-      triggerDownload(encodeWavFile(batchRawAudio, SAMPLE_RATE), 'batch_input.wav');
-      triggerDownload(encodeWavFile(batchCleanAudio, SAMPLE_RATE), 'batch_cleaned.wav');
-      addActivity('Downloaded batch_input.wav & batch_cleaned.wav.', 'good');
+    // =========================================================================
+    // 9. INTERACTIVE SPLIT CURTAIN DRAG & TAP-TO-SEEK (DESKTOP + MOBILE SAFE)
+    // =========================================================================
+    let isDraggingCurtain = false;
+
+    function updateCurtainFromClientX(clientX) {
+      const rect = splitViewLayer.getBoundingClientRect();
+      if (!rect.width) return;
+      splitRatio = Math.max(0.03, Math.min(0.97, (clientX - rect.left) / rect.width));
+      compositeSplitCurtain();
     }
 
+    curtainHandle.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      isDraggingCurtain = true;
+      curtainHandle.setPointerCapture(e.pointerId);
+    });
+
+    curtainHandle.addEventListener('pointermove', (e) => {
+      if (!isDraggingCurtain) return;
+      updateCurtainFromClientX(e.clientX);
+    });
+
+    curtainHandle.addEventListener('pointerup', (e) => {
+      isDraggingCurtain = false;
+      try { curtainHandle.releasePointerCapture(e.pointerId); } catch (_) {}
+    });
+
+    curtainHandle.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); splitRatio = Math.max(0.03, splitRatio - 0.04); compositeSplitCurtain(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); splitRatio = Math.min(0.97, splitRatio + 0.04); compositeSplitCurtain(); }
+    });
+
+    function handleSpectrogramSeek(e) {
+      if (isDraggingCurtain || !batchRawAudio || !batchCleanAudio) return;
+      if (e.target.closest('.curtain-handle')) return;
+      const rect = batchStageWrap.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const targetSec = ratio * (batchRawAudio.length / SAMPLE_RATE);
+      playOrSwitchBatch(activeBatchChannel || 'clean', targetSec);
+    }
+
+    splitViewLayer.addEventListener('click', handleSpectrogramSeek);
+    stackedViewLayer.addEventListener('click', handleSpectrogramSeek);
+
+    // Drag & Drop Audio File onto Batch Chamber
+    batchStageWrap.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      batchStageWrap.classList.add('drag-over');
+    });
+    batchStageWrap.addEventListener('dragleave', () => batchStageWrap.classList.remove('drag-over'));
+    batchStageWrap.addEventListener('drop', (e) => {
+      e.preventDefault();
+      batchStageWrap.classList.remove('drag-over');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleBatchFileUpload(e.dataTransfer.files[0]);
+      }
+    });
+
     // =========================================================================
-    // 8. APP MODE SWITCHING & EVENT LISTENERS
+    // 10. MODE SWITCHING & EVENT BINDINGS
     // =========================================================================
     async function switchAppMode(mode) {
-      if (activeAppMode === mode) return;
-      if (isBatchRecording || isBatchProcessing) return;
-
+      if (activeAppMode === mode || isBatchRecording || isBatchProcessing) return;
       stopBatchPlayback();
       if (isRunning) await stopStream();
 
       activeAppMode = mode;
-      if (mode === 'live') {
-        modeLiveTab.classList.add('active');
-        modeLiveTab.setAttribute('aria-selected', 'true');
-        modeBatchTab.classList.remove('active');
-        modeBatchTab.setAttribute('aria-selected', 'false');
+      const isLive = mode === 'live';
 
-        liveWorkspace.classList.remove('hidden');
-        batchWorkspace.classList.add('hidden');
-        liveTuningGroup.classList.remove('hidden');
-        batchTuningGroup.classList.add('hidden');
-        headerSubtitle.textContent = 'Real-time voice isolation · 48 kHz studio processing';
-      } else {
-        modeBatchTab.classList.add('active');
-        modeBatchTab.setAttribute('aria-selected', 'true');
-        modeLiveTab.classList.remove('active');
-        modeLiveTab.setAttribute('aria-selected', 'false');
+      modeLiveTab.classList.toggle('active', isLive);
+      modeLiveTab.setAttribute('aria-selected', isLive);
+      modeBatchTab.classList.toggle('active', !isLive);
+      modeBatchTab.setAttribute('aria-selected', !isLive);
 
-        liveWorkspace.classList.add('hidden');
-        batchWorkspace.classList.remove('hidden');
-        liveTuningGroup.classList.add('hidden');
-        batchTuningGroup.classList.remove('hidden');
-        headerSubtitle.textContent = 'Superior offline STFT processing · Dual inferno spectrogram';
+      liveWorkspace.classList.toggle('hidden', !isLive);
+      batchWorkspace.classList.toggle('hidden', isLive);
+      liveTuningGroup.classList.toggle('hidden', !isLive);
+      batchTuningGroup.classList.toggle('hidden', isLive);
+
+      if (isLive) {
+        clearLiveCanvas();
+      } else if (batchRawAudio && batchCleanAudio) {
+        setTimeout(() => setBatchViewMode(batchViewMode), 0);
       }
     }
 
     modeLiveTab.addEventListener('click', () => switchAppMode('live'));
     modeBatchTab.addEventListener('click', () => switchAppMode('batch'));
 
-    // Mode 1 Listeners
+    // Live Mode Controls
     startBtn.addEventListener('click', () => isRunning ? stopStream() : startStream());
+    standbyStartBtn.addEventListener('click', startStream);
     toggleAncBtn.addEventListener('click', toggleAnc);
     liveRecBtn.addEventListener('click', toggleLiveRecording);
     exportBufBtn.addEventListener('click', exportRollingBuffer);
     muteMonitorBtn.addEventListener('click', toggleMonitorMute);
 
-    inputSelect.addEventListener('change', switchInputDevice);
+    vizTopoBtn.addEventListener('click', () => setLiveVisMode('topo'));
+    vizSpecBtn.addEventListener('click', () => setLiveVisMode('spec'));
+    vizWaveBtn.addEventListener('click', () => setLiveVisMode('wave'));
 
+    inputSelect.addEventListener('change', switchInputDevice);
     outputSelect.addEventListener('change', async () => {
       if (audioCtx && typeof audioCtx.setSinkId === 'function') {
-        try {
-          await audioCtx.setSinkId(outputSelect.value);
-          addActivity('Switched output device.', 'good');
-        } catch (err) {
-          addActivity(`Output switch failed: ${err.message}`, 'warn');
-        }
+        try { await audioCtx.setSinkId(outputSelect.value); addTrace('Switched monitoring output.', 'good'); }
+        catch (err) { addTrace(`Output switch failed: ${err.message}`, 'warn'); }
       }
     });
 
@@ -2708,30 +3440,25 @@
 
     blendSlider.addEventListener('input', (e) => {
       const pct = parseInt(e.target.value, 10);
-      blendValText.textContent = `${pct}% Filtered · ${100 - pct}% Natural`;
+      blendValText.textContent = `${pct}% Wet · ${100 - pct}% Air`;
       if (workletNode) workletNode.port.postMessage({ type: 'SET_BLEND', blend: pct / 100 });
     });
 
-    document.getElementById('tabSpec').addEventListener('click', (e) => {
-      if (visMode !== 'spec') {
-        visMode = 'spec';
-        clearVisualizerCanvas();
-      }
-      e.target.classList.add('active');
-      document.getElementById('tabWave').classList.remove('active');
+    benchButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        testNoiseMode = btn.dataset.noise;
+        benchButtons.forEach(b => b.classList.toggle('active', b === btn));
+        noiseBenchState.textContent = testNoiseMode === 'off' ? 'Off' : (testNoiseMode === 'pink' ? 'Rumble' : 'Static');
+        if (workletNode) workletNode.port.postMessage({ type: 'SET_NOISE', mode: testNoiseMode });
+        addTrace(testNoiseMode === 'off' ? 'Test noise bench turned off.' : `Injecting pre-filter ${testNoiseMode} noise.`);
+      });
     });
 
-    document.getElementById('tabWave').addEventListener('click', (e) => {
-      if (visMode !== 'wave') {
-        visMode = 'wave';
-        clearVisualizerCanvas();
-      }
-      e.target.classList.add('active');
-      document.getElementById('tabSpec').classList.remove('active');
-    });
-
-    // Mode 2 Listeners
+    // Batch Mode Controls
+    batchViewSplitBtn.addEventListener('click', () => setBatchViewMode('split'));
+    batchViewStackBtn.addEventListener('click', () => setBatchViewMode('stack'));
     batchRecBtn.addEventListener('click', startBatchCapture);
+    batchOverlayRecBtn.addEventListener('click', startBatchCapture);
     batchUploadBtn.addEventListener('click', () => batchFileInput.click());
     batchFileInput.addEventListener('change', (e) => {
       if (e.target.files && e.target.files[0]) {
@@ -2739,17 +3466,23 @@
         e.target.value = '';
       }
     });
-    batchPlayRawBtn.addEventListener('click', () => playBatchBuffer('raw'));
-    batchPlayCleanBtn.addEventListener('click', () => playBatchBuffer('clean'));
+    batchPlayRawBtn.addEventListener('click', () => playOrSwitchBatch('raw'));
+    batchPlayCleanBtn.addEventListener('click', () => playOrSwitchBatch('clean'));
     batchStopPlayBtn.addEventListener('click', stopBatchPlayback);
-    batchDownloadBtn.addEventListener('click', downloadBatchWavPair);
+    batchDownloadBtn.addEventListener('click', () => {
+      if (!batchRawAudio || !batchCleanAudio) return;
+      triggerDownload(encodeWavFile(batchRawAudio, SAMPLE_RATE), 'batch_input.wav');
+      triggerDownload(encodeWavFile(batchCleanAudio, SAMPLE_RATE), 'batch_isolated.wav');
+      addTrace('Exported batch_input.wav & batch_isolated.wav.', 'good');
+    });
 
     batchDurSlider.addEventListener('input', (e) => {
       const sec = parseInt(e.target.value, 10);
-      batchDurSettingText.textContent = `${sec} Seconds`;
+      batchDurSettingText.textContent = `${sec}.0 s`;
       batchRecText.textContent = `Record ${sec} Seconds`;
-      batchDurVal.textContent = `${sec}.0 sec`;
-      batchBadge.textContent = `Idle — ${sec}.0s Capture`;
+      batchOverlayRecText.textContent = `Record ${sec}s Benchmark`;
+      batchDurVal.textContent = `${sec}.0 s`;
+      if (!batchRawAudio) batchStateTag.textContent = `Ready · ${sec}.0 s`;
     });
 
     batchGainSlider.addEventListener('input', (e) => {
@@ -2757,58 +3490,47 @@
       batchGainText.textContent = g.toFixed(1) + '×';
       if (batchRawAudio && batchPureAiAudio) {
         batchCleanAudio = buildBatchOutputBuffer(batchRawAudio, batchPureAiAudio, g);
-        renderInfernoSpectrogram(batchCleanCanvas, batchCleanAudio);
+        renderAllBatchVisuals();
       }
     });
 
-    // Unified Keyboard Shortcuts
+    // Window resize sync
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (activeAppMode === 'live') clearLiveCanvas();
+        else if (batchRawAudio && batchCleanAudio) setBatchViewMode(batchViewMode);
+      }, 120);
+    });
+
+    // Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       const tag = document.activeElement ? document.activeElement.tagName : '';
       if (tag === 'SELECT' || tag === 'INPUT') return;
 
       if (activeAppMode === 'live') {
-        if (e.code === 'Enter' && !isRunning && !isStarting) {
-          e.preventDefault();
-          startStream();
-          return;
-        }
+        if (e.code === 'Enter' && !isRunning && !isStarting) { e.preventDefault(); startStream(); return; }
         if (!isRunning) return;
-        if (e.code === 'Space') {
-          e.preventDefault();
-          toggleAnc();
-        } else if (e.key === 'a' || e.key === 'A') {
-          e.preventDefault();
-          toggleLiveRecording();
-        } else if (e.key === 'r' || e.key === 'R') {
-          e.preventDefault();
-          exportRollingBuffer();
-        } else if (e.key === 'm' || e.key === 'M') {
-          e.preventDefault();
-          toggleMonitorMute();
-        }
+        if (e.code === 'Space') { e.preventDefault(); toggleAnc(); }
+        else if (e.key === 'a' || e.key === 'A') { e.preventDefault(); toggleLiveRecording(); }
+        else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); exportRollingBuffer(); }
+        else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); toggleMonitorMute(); }
       } else if (activeAppMode === 'batch') {
-        if (e.code === 'Enter' && !isBatchRecording && !isBatchProcessing) {
-          e.preventDefault();
-          startBatchCapture();
-        } else if (e.key === '1' && batchRawAudio) {
-          e.preventDefault();
-          playBatchBuffer('raw');
-        } else if (e.key === '2' && batchCleanAudio) {
-          e.preventDefault();
-          playBatchBuffer('clean');
-        } else if (e.key === 's' || e.key === 'S') {
-          e.preventDefault();
-          stopBatchPlayback();
-        } else if (e.key === 'd' || e.key === 'D') {
-          e.preventDefault();
-          downloadBatchWavPair();
-        }
+        if (e.code === 'Enter' && !isBatchRecording && !isBatchProcessing) { e.preventDefault(); startBatchCapture(); }
+        else if (e.key === '1' && batchRawAudio) { e.preventDefault(); playOrSwitchBatch('raw'); }
+        else if (e.key === '2' && batchCleanAudio) { e.preventDefault(); playOrSwitchBatch('clean'); }
+        else if (e.key === 's' || e.key === 'S') { e.preventDefault(); stopBatchPlayback(); }
+        else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); batchDownloadBtn.click(); }
       }
     });
 
+    // Boot
     populateDevices();
-    addActivity('Ready. Use Live Stream for <20ms comms or Batch Studio for 5s STFT analysis.');
+    clearLiveCanvas();
+    runLiveRenderLoop();
+    addTrace('SILENTIA acoustic engine standing by.');
   </script>
 </body>
 </html>
