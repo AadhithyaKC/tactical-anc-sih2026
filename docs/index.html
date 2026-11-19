@@ -1,15 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#ECEDE9" />
+  <meta id="metaThemeColor" name="theme-color" content="#F4F5F2" />
   <title>SILENTIA — Real-Time Acoustic Isolation Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem('silentia-theme');
+        if (saved === 'dark' || saved === 'light') {
+          document.documentElement.setAttribute('data-theme', saved);
+          const meta = document.getElementById('metaThemeColor');
+          if (meta) meta.setAttribute('content', saved === 'dark' ? '#171A21' : '#F4F5F2');
+        }
+      } catch (_) {}
+    })();
+  </script>
   <style>
-    :root {
+    :root,
+    [data-theme="light"] {
       /* Architectural Daylight Stone Chassis */
       --stone-ground: #ECEDE9;
       --stone-surface: #F4F5F2;
@@ -18,10 +31,18 @@
       --rule: #CFD2CA;
       --rule-strong: #B4B8AE;
 
-      /* Ink Hierarchy (WCAG AA+ on stone) */
+      /* Ink Hierarchy */
       --ink: #121418;
       --ink-secondary: #4D525C;
       --ink-muted: #666C77;
+
+      /* Solid Primary Button Tokens */
+      --solid-bg: #121418;
+      --solid-fg: #FFFFFF;
+      --solid-hover: #262A32;
+      --active-pill-bg: #F4F5F2;
+      --active-pill-border: rgba(18, 20, 24, 0.08);
+      --active-pill-shadow: 0 1px 2px rgba(18, 20, 24, 0.1);
 
       /* Matte Anechoic Chamber */
       --chamber: #090B0F;
@@ -33,13 +54,15 @@
       /* Precision Functional Signals */
       --cobalt: #0044FF;
       --cobalt-hover: #0036CC;
-      --cobalt-tint: rgba(0, 68, 255, 0.09);
       --jade: #0B875B;
       --jade-bright: #2DD4A0;
-      --jade-tint: rgba(11, 135, 91, 0.11);
       --vermilion: #D93223;
+      --vermilion-soft-fg: #D93223;
       --vermilion-tint: rgba(217, 50, 35, 0.11);
+      --vermilion-border: rgba(217, 50, 35, 0.45);
       --ochre: #C47B0A;
+
+      --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234D525C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
 
       /* Typography */
       --font-display: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -47,6 +70,49 @@
       --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
       --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="dark"] {
+      /* Anodized Basalt & Machined Titanium Chassis */
+      --stone-ground: #101216;
+      --stone-surface: #171A21;
+      --stone-recess: #0C0E12;
+      --stone-hover: #222732;
+      --rule: #272C36;
+      --rule-strong: #3B4252;
+
+      /* High-Contrast Ink Hierarchy */
+      --ink: #F1F3F6;
+      --ink-secondary: #A9B1C0;
+      --ink-muted: #848D9E;
+
+      /* Solid Primary Button Tokens */
+      --solid-bg: #ECEEF2;
+      --solid-fg: #101216;
+      --solid-hover: #FFFFFF;
+      --active-pill-bg: #242934;
+      --active-pill-border: #3B4252;
+      --active-pill-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+
+      /* Deeper Matte Anechoic Chamber */
+      --chamber: #07080B;
+      --chamber-elev: #0E1117;
+      --chamber-rule: rgba(241, 243, 240, 0.11);
+      --chamber-ink: #F1F3F0;
+      --chamber-muted: #8B93A1;
+
+      /* Calibrated Dark Functional Signals */
+      --cobalt: #245CE6;
+      --cobalt-hover: #356BF0;
+      --jade: #0E8F61;
+      --jade-bright: #34E0A8;
+      --vermilion: #D43527;
+      --vermilion-soft-fg: #FF786B;
+      --vermilion-tint: rgba(217, 50, 35, 0.16);
+      --vermilion-border: rgba(255, 120, 107, 0.42);
+      --ochre: #E0941A;
+
+      --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A9B1C0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
     }
 
     *, *::before, *::after {
@@ -79,6 +145,7 @@
       padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
       overflow-x: hidden;
+      transition: background-color 200ms ease, color 200ms ease;
     }
 
     /* Custom Scrollbars */
@@ -96,7 +163,7 @@
     .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
     /* =====================================================================
-       TOP ARCHITECTURAL BAR
+       TOP ARCHITECTURAL BAR (LOCKED TO STUDIO SHELL COLUMNS ON DESKTOP)
     ===================================================================== */
     .topbar {
       width: 100%;
@@ -105,28 +172,49 @@
       position: sticky;
       top: 0;
       z-index: 40;
+      transition: background-color 200ms ease, border-color 200ms ease;
     }
 
     .topbar-inner {
       max-width: 1440px;
       margin: 0 auto;
-      padding: 12px 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: 1fr;
     }
 
-    @media (min-width: 960px) {
+    @media (min-width: 1024px) {
       .topbar-inner {
-        padding: 0 28px;
-        height: 62px;
-        flex-wrap: nowrap;
+        grid-template-columns: minmax(0, 1fr) 364px;
+        border-left: 1px solid var(--rule);
+        border-right: 1px solid var(--rule);
       }
     }
 
-    .brand {
+    /* Left Topbar Bay: aligns directly over the Primary Stage */
+    .topbar-stage-bay {
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-areas:
+        "brand mobile-right"
+        "nav nav";
+      align-items: center;
+      gap: 10px 12px;
+    }
+
+    @media (min-width: 1024px) {
+      .topbar-stage-bay {
+        padding: 0 24px;
+        height: 62px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+    }
+
+    .brand-cluster {
+      grid-area: brand;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -137,11 +225,12 @@
       width: 28px;
       height: 28px;
       border-radius: 6px;
-      background: var(--ink);
-      color: var(--stone-surface);
+      background: var(--solid-bg);
+      color: var(--solid-fg);
       display: grid;
       place-items: center;
       flex-shrink: 0;
+      transition: background-color 200ms ease, color 200ms ease;
     }
 
     .brand-title {
@@ -161,47 +250,89 @@
       padding-left: 10px;
       border-left: 1px solid var(--rule);
       letter-spacing: -0.01em;
+      white-space: nowrap;
     }
 
-    @media (min-width: 640px) {
+    @media (min-width: 1180px) {
       .brand-spec { display: inline-block; }
     }
 
-    /* Mode Switcher */
+    /* Mode Switcher — Flush right inside the Primary Stage bay on desktop */
     .mode-nav {
-      display: inline-flex;
+      grid-area: nav;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 100%;
       background: var(--stone-recess);
       border: 1px solid var(--rule);
       border-radius: 8px;
       padding: 3px;
-      gap: 2px;
+      gap: 3px;
+    }
+
+    @media (min-width: 1024px) {
+      .mode-nav {
+        width: auto;
+        min-width: 268px;
+        flex-shrink: 0;
+      }
     }
 
     .mode-btn {
       appearance: none;
-      border: none;
+      border: 1px solid transparent;
       background: transparent;
       color: var(--ink-secondary);
       font-family: var(--font-ui);
       font-size: 0.84rem;
       font-weight: 600;
-      padding: 7px 14px;
+      padding: 7px 16px;
       border-radius: 6px;
       cursor: pointer;
-      transition: background 180ms var(--ease-out-expo), color 180ms ease;
+      transition: background 180ms var(--ease-out-expo), color 180ms ease, border-color 180ms ease;
       min-height: 36px;
       white-space: nowrap;
+      text-align: center;
     }
 
     .mode-btn:hover { color: var(--ink); }
 
     .mode-btn.active {
-      background: var(--stone-surface);
+      background: var(--active-pill-bg);
       color: var(--ink);
-      box-shadow: 0 1px 2px rgba(18, 20, 24, 0.1);
+      border-color: var(--active-pill-border);
+      box-shadow: var(--active-pill-shadow);
     }
 
-    /* Engine Status Indicator */
+    /* Right Topbar Bay: aligns directly over the 364px Calibration Rail */
+    .topbar-rail-bay {
+      display: none;
+    }
+
+    @media (min-width: 1024px) {
+      .topbar-rail-bay {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 22px;
+        height: 62px;
+        border-left: 1px solid var(--rule);
+        gap: 12px;
+      }
+    }
+
+    .mobile-status-slot {
+      grid-area: mobile-right;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      justify-self: end;
+    }
+
+    @media (min-width: 1024px) {
+      .mobile-status-slot { display: none; }
+    }
+
     .engine-readout {
       display: inline-flex;
       align-items: center;
@@ -210,6 +341,7 @@
       font-size: 0.74rem;
       color: var(--ink-secondary);
       letter-spacing: -0.01em;
+      white-space: nowrap;
     }
 
     .status-dot {
@@ -230,8 +362,32 @@
       50% { opacity: 0.25; }
     }
 
+    .theme-toggle {
+      appearance: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 7px;
+      border: 1px solid var(--rule-strong);
+      background: var(--stone-ground);
+      color: var(--ink);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 150ms ease, border-color 150ms ease, transform 120ms ease;
+    }
+
+    .theme-toggle:hover {
+      background: var(--stone-hover);
+      border-color: var(--ink-muted);
+    }
+
+    .theme-toggle:active {
+      transform: scale(0.95);
+    }
+
     /* =====================================================================
-       MAIN ARCHITECTURAL SHELL (NO FLOATING CARDS)
+       MAIN ARCHITECTURAL SHELL
     ===================================================================== */
     .studio-shell {
       max-width: 1440px;
@@ -240,13 +396,11 @@
       flex: 1;
       display: grid;
       grid-template-columns: 1fr;
-      border-left: 0;
-      border-right: 0;
     }
 
     @media (min-width: 1024px) {
       .studio-shell {
-        grid-template-columns: minmax(0, 1fr) 356px;
+        grid-template-columns: minmax(0, 1fr) 364px;
         border-left: 1px solid var(--rule);
         border-right: 1px solid var(--rule);
       }
@@ -259,7 +413,7 @@
     }
 
     /* =====================================================================
-       MONUMENTAL ANECHOIC CHAMBER (VISUAL ART STAGE)
+       MONUMENTAL ANECHOIC CHAMBER
     ===================================================================== */
     .chamber-frame {
       position: relative;
@@ -289,7 +443,6 @@
       display: block;
     }
 
-    /* Floating Minimal Controls inside Chamber */
     .chamber-hud-top {
       position: absolute;
       top: 14px;
@@ -370,7 +523,6 @@
       background: rgba(217, 50, 35, 0.2);
     }
 
-    /* Chamber Standby Overlay (Art Invitation) */
     .standby-overlay {
       position: absolute;
       inset: 0;
@@ -431,7 +583,7 @@
     .standby-cta:active { transform: scale(0.98); }
 
     /* =====================================================================
-       INTEGRATED TELEMETRY STRIP (FUSED TO CHAMBER BOTTOM)
+       INTEGRATED TELEMETRY STRIP
     ===================================================================== */
     .telemetry-strip {
       background: var(--chamber-elev);
@@ -541,7 +693,7 @@
     .metric-v.accent { color: var(--jade-bright); }
 
     /* =====================================================================
-       PRIMARY TRANSPORT BAY (LIGHT ARCHITECTURAL SURFACE)
+       PRIMARY TRANSPORT BAY
     ===================================================================== */
     .transport-bay {
       padding: 18px 16px;
@@ -550,6 +702,7 @@
       flex-direction: column;
       gap: 12px;
       flex: 1;
+      transition: background-color 200ms ease;
     }
 
     @media (min-width: 768px) {
@@ -579,9 +732,7 @@
     }
 
     @media (min-width: 520px) {
-      .transport-secondary-row {
-        gap: 10px;
-      }
+      .transport-secondary-row { gap: 10px; }
     }
 
     .ctrl-btn {
@@ -625,18 +776,17 @@
       text-overflow: ellipsis;
     }
 
-    /* Primary Hardware States */
     .ctrl-btn.solid-ink {
-      background: var(--ink);
-      color: #FFFFFF;
-      border-color: var(--ink);
+      background: var(--solid-bg);
+      color: var(--solid-fg);
+      border-color: var(--solid-bg);
     }
-    .ctrl-btn.solid-ink:hover:not(:disabled) { background: #262A32; }
+    .ctrl-btn.solid-ink:hover:not(:disabled) { background: var(--solid-hover); }
 
     .ctrl-btn.solid-ink.active {
       background: var(--vermilion-tint);
-      color: var(--vermilion);
-      border-color: rgba(217, 50, 35, 0.45);
+      color: var(--vermilion-soft-fg);
+      border-color: var(--vermilion-border);
     }
 
     .ctrl-btn.solid-cobalt {
@@ -659,9 +809,9 @@
     }
 
     .ctrl-btn.ab-raw-active {
-      background: var(--ink);
-      color: #FFFFFF;
-      border-color: var(--ink);
+      background: var(--solid-bg);
+      color: var(--solid-fg);
+      border-color: var(--solid-bg);
     }
 
     .ctrl-btn.ab-clean-active {
@@ -703,7 +853,7 @@
     }
 
     /* =====================================================================
-       BATCH LAB — INTERACTIVE SPLIT CURTAIN & STACKED SPECTROGRAMS
+       BATCH STUDIO — INTERACTIVE SPLIT CURTAIN & STACKED SPECTROGRAMS
     ===================================================================== */
     .batch-stage-wrap {
       position: relative;
@@ -760,8 +910,8 @@
       border-radius: 50%;
       background: var(--stone-surface);
       color: var(--ink);
-      border: 2px solid var(--ink);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+      border: 2px solid var(--rule-strong);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
       display: grid;
       place-items: center;
       cursor: ew-resize;
@@ -775,7 +925,7 @@
       bottom: 12px;
       padding: 4px 9px;
       border-radius: 5px;
-      background: rgba(9, 11, 15, 0.8);
+      background: rgba(9, 11, 15, 0.82);
       border: 1px solid var(--chamber-rule);
       font-family: var(--font-mono);
       font-size: 0.68rem;
@@ -840,13 +990,14 @@
     }
 
     /* =====================================================================
-       RIGHT CALIBRATION RAIL (FLUSH DESKTOP COLUMN / CLEAN MOBILE DRAWERS)
+       RIGHT CALIBRATION RAIL
     ===================================================================== */
     .calibration-rail {
       background: var(--stone-ground);
       border-top: 1px solid var(--rule);
       display: flex;
       flex-direction: column;
+      transition: background-color 200ms ease, border-color 200ms ease;
     }
 
     @media (min-width: 1024px) {
@@ -905,9 +1056,7 @@
     }
 
     @media (min-width: 1024px) {
-      .rail-body {
-        padding: 6px 22px 22px;
-      }
+      .rail-body { padding: 6px 22px 22px; }
     }
 
     .param-group {
@@ -935,9 +1084,9 @@
       font-weight: 500;
       color: var(--ink);
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
 
-    /* Native-Clean Select */
     .studio-select {
       width: 100%;
       padding: 11px 36px 11px 12px;
@@ -946,14 +1095,14 @@
       background-color: var(--stone-surface);
       color: var(--ink);
       font-family: var(--font-ui);
-      font-size: 16px; /* Prevents iOS Safari zoom */
+      font-size: 16px;
       outline: none;
       cursor: pointer;
       appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234D525C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-image: var(--select-chevron);
       background-repeat: no-repeat;
       background-position: right 11px center;
-      transition: border-color 150ms ease;
+      transition: border-color 150ms ease, background-color 200ms ease;
     }
 
     @media (min-width: 768px) {
@@ -963,7 +1112,6 @@
     .studio-select:focus { border-color: var(--cobalt); }
     .studio-select:disabled { opacity: 0.55; cursor: not-allowed; }
 
-    /* Precision Tactile Fader */
     .studio-fader {
       -webkit-appearance: none;
       appearance: none;
@@ -984,7 +1132,7 @@
       border-radius: 50%;
       background: var(--ink);
       border: 3px solid var(--stone-surface);
-      box-shadow: 0 1px 4px rgba(18, 20, 24, 0.35);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
       cursor: pointer;
       transition: transform 120ms ease, background 120ms ease;
     }
@@ -995,15 +1143,12 @@
       border-radius: 50%;
       background: var(--ink);
       border: 3px solid var(--stone-surface);
-      box-shadow: 0 1px 4px rgba(18, 20, 24, 0.35);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
       cursor: pointer;
     }
 
     @media (pointer: coarse) {
-      .studio-fader::-webkit-slider-thumb {
-        width: 26px;
-        height: 26px;
-      }
+      .studio-fader::-webkit-slider-thumb { width: 26px; height: 26px; }
     }
 
     .studio-fader::-webkit-slider-thumb:hover {
@@ -1011,7 +1156,6 @@
       transform: scale(1.08);
     }
 
-    /* Segmented Radio Pills (Test Noise Bench) */
     .noise-bench {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -1024,7 +1168,7 @@
 
     .bench-opt {
       appearance: none;
-      border: none;
+      border: 1px solid transparent;
       background: transparent;
       color: var(--ink-secondary);
       font-family: var(--font-ui);
@@ -1033,20 +1177,22 @@
       padding: 8px 6px;
       border-radius: 5px;
       cursor: pointer;
-      transition: background 150ms ease, color 150ms ease;
+      transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
       min-height: 36px;
     }
 
     .bench-opt.active {
-      background: var(--stone-surface);
+      background: var(--active-pill-bg);
       color: var(--ink);
-      box-shadow: 0 1px 2px rgba(18, 20, 24, 0.1);
+      border-color: var(--active-pill-border);
+      box-shadow: var(--active-pill-shadow);
     }
 
     .bench-opt.active[data-noise="pink"],
     .bench-opt.active[data-noise="white"] {
-      background: var(--ink);
-      color: #FFFFFF;
+      background: var(--solid-bg);
+      color: var(--solid-fg);
+      border-color: var(--solid-bg);
     }
 
     .param-hint {
@@ -1055,61 +1201,114 @@
       line-height: 1.4;
     }
 
-    /* Session Trace Log */
+    /* Phosphor-Luminous Session Trace Console */
     .trace-box {
-      background: var(--stone-surface);
-      border: 1px solid var(--rule);
+      background: var(--chamber);
+      border: 1px solid var(--rule-strong);
       border-radius: 7px;
-      padding: 10px 12px;
-      height: 148px;
+      padding: 12px 13px;
+      height: 152px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 7px;
       font-size: 0.76rem;
+      box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.55);
     }
 
     .trace-row {
       display: flex;
       gap: 8px;
-      line-height: 1.38;
-      color: var(--ink-secondary);
+      line-height: 1.4;
     }
 
     .trace-ts {
       font-family: var(--font-mono);
       font-size: 0.7rem;
-      color: var(--ink-muted);
+      color: #82A6DF;
+      text-shadow: 0 0 8px rgba(100, 155, 255, 0.45);
       flex-shrink: 0;
     }
 
-    .trace-row.good .trace-msg { color: var(--jade); font-weight: 500; }
-    .trace-row.warn .trace-msg { color: var(--vermilion); font-weight: 500; }
+    .trace-msg {
+      color: #E5EEFF;
+      text-shadow: 0 0 8px rgba(138, 184, 255, 0.55), 0 0 16px rgba(36, 92, 230, 0.3);
+    }
+
+    .trace-row.good .trace-msg {
+      color: #56F2BE;
+      font-weight: 500;
+      text-shadow: 0 0 8px rgba(45, 212, 160, 0.72), 0 0 18px rgba(11, 135, 91, 0.42);
+    }
+
+    .trace-row.warn .trace-msg {
+      color: #FF8A7E;
+      font-weight: 500;
+      text-shadow: 0 0 8px rgba(255, 110, 96, 0.72), 0 0 18px rgba(217, 50, 35, 0.42);
+    }
   </style>
 </head>
 <body>
 
-  <!-- Top Architectural Bar -->
+  <!-- Top Architectural Bar (Locked to Primary Stage + 364px Rail) -->
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M2 12h3l2-7 3 14 3-10 2 5 2-2h5"/>
-          </svg>
+      <div class="topbar-stage-bay">
+        <div class="brand-cluster">
+          <div class="brand-mark" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12h3l2-7 3 14 3-10 2 5 2-2h5"/>
+            </svg>
+          </div>
+          <span class="brand-title">SILENTIA</span>
+          <span class="brand-spec">DeepFilterNet3 · 48 kHz WASM</span>
         </div>
-        <span class="brand-title">SILENTIA</span>
-        <span class="brand-spec">DeepFilterNet3 · 48 kHz WASM</span>
+
+        <!-- Mobile-only status + theme slot -->
+        <div class="mobile-status-slot">
+          <div class="engine-readout" aria-live="polite">
+            <span class="status-dot js-status-dot"></span>
+            <span class="js-engine-status">Standby</span>
+          </div>
+          <button class="theme-toggle js-theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false" title="Toggle theme">
+            <svg class="js-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <svg class="js-icon-sun hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2v2"/><path d="M12 20v2"/>
+              <path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/>
+              <path d="M2 12h2"/><path d="M20 12h2"/>
+              <path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+            </svg>
+          </button>
+        </div>
+
+        <nav class="mode-nav" role="tablist" aria-label="Studio mode">
+          <button id="modeLiveTab" class="mode-btn active" role="tab" aria-selected="true">Live Chamber</button>
+          <button id="modeBatchTab" class="mode-btn" role="tab" aria-selected="false">Batch Studio</button>
+        </nav>
       </div>
 
-      <nav class="mode-nav" role="tablist" aria-label="Studio mode">
-        <button id="modeLiveTab" class="mode-btn active" role="tab" aria-selected="true">Live Chamber</button>
-        <button id="modeBatchTab" class="mode-btn" role="tab" aria-selected="false">Batch Lab</button>
-      </nav>
+      <!-- Desktop Right Rail Header Bay -->
+      <div class="topbar-rail-bay">
+        <div class="engine-readout" aria-live="polite">
+          <span class="status-dot js-status-dot"></span>
+          <span class="js-engine-status">Standby</span>
+        </div>
 
-      <div class="engine-readout" aria-live="polite">
-        <span id="statusDot" class="status-dot"></span>
-        <span id="engineStatus">Standby</span>
+        <button class="theme-toggle js-theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false" title="Toggle theme">
+          <svg class="js-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <svg class="js-icon-sun hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2"/><path d="M12 20v2"/>
+            <path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/>
+            <path d="M2 12h2"/><path d="M20 12h2"/>
+            <path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+          </svg>
+        </button>
       </div>
     </div>
   </header>
@@ -1252,9 +1451,9 @@
       </section>
 
       <!-- ===============================================================
-           MODE 2: BATCH LAB (OFFLINE STFT + INTERACTIVE A/B CURTAIN)
+           MODE 2: BATCH STUDIO (OFFLINE STFT + INTERACTIVE A/B CURTAIN)
       ================================================================ -->
-      <section id="batchWorkspace" class="hidden" aria-label="Batch Lab">
+      <section id="batchWorkspace" class="hidden" aria-label="Batch Studio">
         <div class="chamber-frame">
           <div id="batchStageWrap" class="batch-stage-wrap">
             <div class="chamber-hud-top">
@@ -1462,9 +1661,9 @@
             <div class="param-group">
               <div class="param-head">
                 <label for="blendSlider" class="param-label">Isolation Mix</label>
-                <span id="blendValText" class="param-value">90% Wet · 10% Air</span>
+                <span id="blendValText" class="param-value">90% Filter Strength</span>
               </div>
-              <input id="blendSlider" class="studio-fader" type="range" min="50" max="100" step="5" value="90" />
+              <input id="blendSlider" class="studio-fader" type="range" min="0" max="100" step="1" value="90" />
             </div>
 
             <div class="param-group">
@@ -1595,7 +1794,6 @@
           this.aiBlend = 0.90;
           this.ceiling = 0.98;
 
-          // Optional pre-filter synthetic test noise generator (Paul Kellet pink filter)
           this.testNoise = 'off';
           this.b0 = 0; this.b1 = 0; this.b2 = 0; this.b3 = 0; this.b4 = 0; this.b5 = 0; this.b6 = 0;
 
@@ -1878,6 +2076,10 @@
     let cachedAssets = null;
     let batchWorker = null;
 
+    // Theme State
+    let chamberBg = '#090B0F';
+    let chamberRgb = [9, 11, 15];
+
     // Live Stream State
     let audioCtx = null;
     let sourceNode = null;
@@ -1895,10 +2097,9 @@
     let isRecordingLive = false;
     let monitorMuted = false;
     let testNoiseMode = 'off';
-    let visMode = 'topo'; // 'topo' | 'spec' | 'wave'
+    let visMode = 'topo';
     let liveAnimId = null;
 
-    // Topography 3D Waterfall Ring
     const TOPO_LAYERS = 34;
     const TOPO_BINS = 64;
     let topoHistory = Array.from({ length: TOPO_LAYERS }, () => new Float32Array(TOPO_BINS));
@@ -1909,16 +2110,14 @@
     let batchRawAudio = null;
     let batchPureAiAudio = null;
     let batchCleanAudio = null;
-    let batchViewMode = 'split'; // 'split' | 'stack'
+    let batchViewMode = 'split';
     let splitRatio = 0.5;
     let isBatchRecording = false;
     let isBatchProcessing = false;
 
-    // Offscreen rendered spectrograms for instant 60fps split curtain wiping
     const offRawCanvas = document.createElement('canvas');
     const offCleanCanvas = document.createElement('canvas');
 
-    // Gapless Synchronized A/B Playback State
     let batchPlayCtx = null;
     let batchSrcRaw = null;
     let batchSrcClean = null;
@@ -1928,13 +2127,17 @@
     let batchPlayOffsetSec = 0;
     let batchPlayDuration = 0;
     let batchPlayheadAnimId = null;
-    let activeBatchChannel = null; // 'raw' | 'clean' | null
+    let activeBatchChannel = null;
 
     // DOM Elements
     const modeLiveTab = document.getElementById('modeLiveTab');
     const modeBatchTab = document.getElementById('modeBatchTab');
-    const statusDot = document.getElementById('statusDot');
-    const engineStatus = document.getElementById('engineStatus');
+    const statusDots = document.querySelectorAll('.js-status-dot');
+    const engineStatusEls = document.querySelectorAll('.js-engine-status');
+    const themeToggleBtns = document.querySelectorAll('.js-theme-toggle');
+    const themeMoonIcons = document.querySelectorAll('.js-icon-moon');
+    const themeSunIcons = document.querySelectorAll('.js-icon-sun');
+    const metaThemeColor = document.getElementById('metaThemeColor');
 
     const liveWorkspace = document.getElementById('liveWorkspace');
     const batchWorkspace = document.getElementById('batchWorkspace');
@@ -1980,7 +2183,6 @@
     const benchButtons = document.querySelectorAll('.bench-opt');
     const consoleBox = document.getElementById('consoleBox');
 
-    // Batch DOM Elements
     const batchStageWrap = document.getElementById('batchStageWrap');
     const batchViewSplitBtn = document.getElementById('batchViewSplitBtn');
     const batchViewStackBtn = document.getElementById('batchViewStackBtn');
@@ -2017,8 +2219,42 @@
     const batchGainText = document.getElementById('batchGainText');
 
     // =========================================================================
-    // 3. UTILITIES, TRACE LOG & RESPONSIVE DRAWERS
+    // 3. STATUS HELPERS, SILENT THEME TOGGLE, TRACE LOG & RESPONSIVE DRAWERS
     // =========================================================================
+    function setEngineStatus(dotState, labelText) {
+      const cls = dotState ? `status-dot js-status-dot ${dotState}` : 'status-dot js-status-dot';
+      statusDots.forEach(dot => { dot.className = cls; });
+      engineStatusEls.forEach(el => { el.textContent = labelText; });
+    }
+
+    function applyTheme(theme, persist = true) {
+      const isDark = theme === 'dark';
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      themeMoonIcons.forEach(el => el.classList.toggle('hidden', isDark));
+      themeSunIcons.forEach(el => el.classList.toggle('hidden', !isDark));
+      themeToggleBtns.forEach(btn => {
+        btn.setAttribute('aria-pressed', String(isDark));
+        btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+      });
+      if (metaThemeColor) metaThemeColor.setAttribute('content', isDark ? '#171A21' : '#F4F5F2');
+
+      chamberBg = isDark ? '#07080B' : '#090B0F';
+      chamberRgb = isDark ? [7, 8, 11] : [9, 11, 15];
+
+      if (persist) {
+        try { localStorage.setItem('silentia-theme', isDark ? 'dark' : 'light'); } catch (_) {}
+      }
+    }
+
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'light', false);
+
+    themeToggleBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme');
+        applyTheme(current === 'dark' ? 'light' : 'dark', true);
+      });
+    });
+
     function addTrace(msg, tone = '') {
       const now = new Date().toLocaleTimeString('en-US', {
         hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'
@@ -2048,7 +2284,6 @@
     }
     syncResponsiveDrawers();
 
-    // Hide Output Selector gracefully on mobile browsers that do not support setSinkId
     if (typeof AudioContext !== 'undefined' && !('setSinkId' in AudioContext.prototype)) {
       outputFieldWrap.classList.add('hidden');
     }
@@ -2261,7 +2496,7 @@
 
     function clearLiveCanvas() {
       syncCanvasSize(liveCanvas);
-      liveCtx.fillStyle = '#090B0F';
+      liveCtx.fillStyle = chamberBg;
       liveCtx.fillRect(0, 0, liveCanvas.width, liveCanvas.height);
       specColImage = liveCtx.createImageData(2, Math.max(1, liveCanvas.height));
       for (let i = 0; i < TOPO_LAYERS; i++) topoHistory[i].fill(0);
@@ -2276,12 +2511,11 @@
       vizSpecBtn.setAttribute('aria-selected', mode === 'spec');
       vizWaveBtn.classList.toggle('active', mode === 'wave');
       vizWaveBtn.setAttribute('aria-selected', mode === 'wave');
-      // Always wipe cleanly when switching between modes (desktop & Android)
       clearLiveCanvas();
     }
 
     function drawTopographyFrame(W, H, liveActive) {
-      liveCtx.fillStyle = '#090B0F';
+      liveCtx.fillStyle = chamberBg;
       liveCtx.fillRect(0, 0, W, H);
 
       topoTick++;
@@ -2291,14 +2525,11 @@
           cleanAnalyser.getByteFrequencyData(liveFreqBins);
           const maxBin = Math.floor(liveFreqBins.length * 0.58);
           for (let i = 0; i < TOPO_BINS; i++) {
-            // Log-like spacing so vocal fundamentals (100Hz - 4kHz) have sculptural prominence
             const t = i / (TOPO_BINS - 1);
             const idx = Math.min(maxBin - 1, Math.floor(Math.pow(t, 1.45) * maxBin));
-            const val = liveFreqBins[idx] / 255;
-            recycled[i] = val;
+            recycled[i] = liveFreqBins[idx] / 255;
           }
         } else {
-          // Serene ambient breathing field in standby
           standbyPhase += 0.045;
           for (let i = 0; i < TOPO_BINS; i++) {
             const x = i / (TOPO_BINS - 1);
@@ -2316,9 +2547,8 @@
       const bottomY = H * 0.94;
       const maxLift = H * 0.28;
 
-      // Draw from farthest ridge (index TOPO_LAYERS - 1) to closest (index 0)
       for (let layer = TOPO_LAYERS - 1; layer >= 0; layer--) {
-        const depth = 1 - layer / (TOPO_LAYERS - 1); // 0 = far, 1 = near
+        const depth = 1 - layer / (TOPO_LAYERS - 1);
         const persp = Math.pow(depth, 1.38);
         const baseY = horizonY + (bottomY - horizonY) * persp;
         const spanW = W * (0.62 + 0.44 * persp);
@@ -2341,9 +2571,7 @@
           } else {
             const prevX = startX + (i - 1) * stepX;
             const prevY = baseY - slice[i - 1] * ampScale;
-            const cx = (prevX + x) * 0.5;
-            const cy = (prevY + y) * 0.5;
-            liveCtx.quadraticCurveTo(prevX, prevY, cx, cy);
+            liveCtx.quadraticCurveTo(prevX, prevY, (prevX + x) * 0.5, (prevY + y) * 0.5);
           }
         }
         const lastX = startX + spanW;
@@ -2352,26 +2580,21 @@
         liveCtx.lineTo(lastX, baseY + 40);
         liveCtx.closePath();
 
-        // Matte obsidian occlusion fill
-        liveCtx.fillStyle = '#090B0F';
+        liveCtx.fillStyle = chamberBg;
         liveCtx.fill();
 
-        // Architectural line stroke colored by live state
         const avgEnergy = energySum / TOPO_BINS;
         const alpha = 0.08 + 0.78 * Math.pow(depth, 1.25);
 
         if (liveActive && ancEnabled) {
-          // Isolated voice: serene cobalt horizon shifting to luminous jade on vocal ridges
           const jadeMix = Math.min(1, avgEnergy * 3.8);
           const r = Math.round(35 + (45 - 35) * jadeMix);
           const g = Math.round(108 + (212 - 108) * jadeMix);
           const b = Math.round(255 + (160 - 255) * jadeMix);
           liveCtx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
         } else if (liveActive) {
-          // Raw mic: crisp silver-chalk ridges
           liveCtx.strokeStyle = `rgba(222, 227, 236, ${alpha.toFixed(3)})`;
         } else {
-          // Standby: subtle cobalt-tinted architectural lines
           liveCtx.strokeStyle = `rgba(140, 168, 235, ${(alpha * 0.48).toFixed(3)})`;
         }
 
@@ -2385,7 +2608,7 @@
         specColImage = liveCtx.createImageData(2, H);
       }
       if (!liveActive || !cleanAnalyser || !liveFreqBins) {
-        liveCtx.fillStyle = '#090B0F';
+        liveCtx.fillStyle = chamberBg;
         liveCtx.fillRect(0, 0, W, H);
         return;
       }
@@ -2399,11 +2622,10 @@
       for (let y = 0; y < H; y++) {
         const binIdx = (((H - 1 - y) * usableBins) / H) | 0;
         const ratio = liveFreqBins[binIdx] / 255;
-        let r = 9, g = 11, b = 15;
+        let r = chamberRgb[0], g = chamberRgb[1], b = chamberRgb[2];
 
         if (ratio > 0.03) {
           if (ancEnabled) {
-            // Precision cobalt -> jade -> alabaster thermal scale for isolated vocals
             r = Math.min(255, Math.floor(14 + 210 * Math.pow(ratio, 2.2)));
             g = Math.min(255, Math.floor(55 + 195 * Math.pow(ratio, 0.95)));
             b = Math.min(255, Math.floor(125 + 125 * Math.pow(ratio, 1.05)));
@@ -2423,13 +2645,12 @@
     }
 
     function drawWaveFrame(W, H, liveActive) {
-      liveCtx.fillStyle = '#090B0F';
+      liveCtx.fillStyle = chamberBg;
       liveCtx.fillRect(0, 0, W, H);
 
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const midY = H * 0.5;
 
-      // Subtle architectural center axis & quartile hairlines
       liveCtx.strokeStyle = 'rgba(241, 243, 240, 0.07)';
       liveCtx.lineWidth = dpr;
       liveCtx.beginPath();
@@ -2440,7 +2661,6 @@
 
       if (!liveActive || !cleanAnalyser || !liveCleanWave) return;
 
-      // Ghost trace: Raw microphone waveform (when ANC is active)
       if (ancEnabled && rawAnalyser && liveRawWave) {
         rawAnalyser.getFloatTimeDomainData(liveRawWave);
         liveCtx.beginPath();
@@ -2456,7 +2676,6 @@
         liveCtx.stroke();
       }
 
-      // Primary trace: Cleaned or live output waveform with rising zero-crossing trigger
       cleanAnalyser.getFloatTimeDomainData(liveCleanWave);
       let triggerIdx = 0;
       const searchLim = Math.floor(liveCleanWave.length * 0.45);
@@ -2489,7 +2708,7 @@
         if (activeAppMode !== 'live') return;
 
         if (syncCanvasSize(liveCanvas)) {
-          liveCtx.fillStyle = '#090B0F';
+          liveCtx.fillStyle = chamberBg;
           liveCtx.fillRect(0, 0, liveCanvas.width, liveCanvas.height);
           specColImage = liveCtx.createImageData(2, Math.max(1, liveCanvas.height));
         }
@@ -2514,14 +2733,12 @@
       isStarting = true;
       startBtn.disabled = true;
       standbyStartBtn.disabled = true;
-      statusDot.className = 'status-dot loading';
-      engineStatus.textContent = 'Loading WASM...';
+      setEngineStatus('loading', 'Loading WASM...');
       liveStateTag.textContent = 'Loading Model';
       addTrace('Initializing 48 kHz AudioWorklet & DeepFilterNet3...');
 
       let workletUrl = null;
       try {
-        // Unlock AudioContext immediately while click/tap gesture is fresh
         audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE, latencyHint: 'interactive' });
         const initialResume = audioCtx.resume().catch(() => {});
 
@@ -2572,13 +2789,11 @@
             if (audioCtx && audioCtx.state === 'suspended') {
               try { await audioCtx.resume(); } catch (_) {}
             }
-            statusDot.className = 'status-dot live';
-            engineStatus.textContent = `Live · ${(audioCtx.sampleRate / 1000).toFixed(0)} kHz`;
+            setEngineStatus('live', `Live · ${(audioCtx.sampleRate / 1000).toFixed(0)} kHz`);
             liveStateTag.textContent = ancEnabled ? 'Voice Isolated' : 'Raw Passthrough';
             addTrace(`DeepFilterNet3 ready (${d.hopSize}-sample frames).`, 'good');
           } else if (d.type === 'WASM_ERROR') {
-            statusDot.className = 'status-dot live';
-            engineStatus.textContent = 'Bypass Only';
+            setEngineStatus('live', 'Bypass Only');
             liveStateTag.textContent = 'WASM Error';
             addTrace(`WASM error: ${d.message}`, 'warn');
           } else if (d.type === 'AUDIO_HOP') {
@@ -2660,8 +2875,7 @@
         isRunning = false;
         startBtn.disabled = false;
         standbyStartBtn.disabled = false;
-        statusDot.className = 'status-dot';
-        engineStatus.textContent = 'Standby';
+        setEngineStatus('', 'Standby');
         liveStateTag.textContent = 'Standby';
         addTrace(`Start failed: ${err.message}`, 'warn');
       }
@@ -2691,8 +2905,7 @@
       wasmLoaded = false;
       ancEnabled = false;
 
-      statusDot.className = 'status-dot';
-      engineStatus.textContent = 'Standby';
+      setEngineStatus('', 'Standby');
       liveStateTag.textContent = 'Standby';
       liveStateTag.className = 'chamber-state-tag';
 
@@ -2736,14 +2949,14 @@
         liveCleanChunks = [];
         isRecordingLive = true;
         playCueChime(1180, 0.08);
-        statusDot.className = 'status-dot rec';
+        setEngineStatus('rec', 'Recording');
         liveRecBtn.classList.add('rec-active');
         liveRecText.textContent = 'Stop & Save';
         addTrace('Recording raw + isolated streams...');
       } else {
         isRecordingLive = false;
         playCueChime(580, 0.08);
-        statusDot.className = 'status-dot live';
+        setEngineStatus('live', `Live · ${(audioCtx.sampleRate / 1000).toFixed(0)} kHz`);
         liveRecBtn.classList.remove('rec-active');
         liveRecText.textContent = 'Record';
 
@@ -2792,7 +3005,7 @@
     }
 
     // =========================================================================
-    // 8. MODE 2: BATCH LAB (STFT SPECTROGRAMS + SPLIT CURTAIN + GAPLESS A/B)
+    // 8. MODE 2: BATCH STUDIO (STFT SPECTROGRAMS + SPLIT CURTAIN + GAPLESS A/B)
     // =========================================================================
     const FFT_N = 1024;
     const HANN_WIN = new Float32Array(FFT_N);
@@ -2882,7 +3095,6 @@
       }
       c.putImageData(img, 0, 0);
 
-      // Subtle architectural frequency grid lines
       c.strokeStyle = 'rgba(241, 243, 240, 0.1)';
       c.lineWidth = 1;
       for (let g = 1; g <= 3; g++) {
@@ -2900,14 +3112,12 @@
       const splitX = Math.round(W * splitRatio);
 
       c.clearRect(0, 0, W, H);
-      // Left side: Raw Corrupted
       if (splitX > 0) {
         c.save();
         c.beginPath(); c.rect(0, 0, splitX, H); c.clip();
         c.drawImage(offRawCanvas, 0, 0, W, H);
         c.restore();
       }
-      // Right side: AI Isolated
       if (splitX < W) {
         c.save();
         c.beginPath(); c.rect(splitX, 0, W - splitX, H); c.clip();
@@ -2928,7 +3138,6 @@
 
       compositeSplitCurtain();
 
-      // Update stacked canvases too
       syncCanvasSize(batchRawCanvas);
       syncCanvasSize(batchCleanCanvas);
       batchRawCanvas.getContext('2d').drawImage(offRawCanvas, 0, 0, batchRawCanvas.width, batchRawCanvas.height);
@@ -3000,7 +3209,6 @@
       return Math.max(0, 20 * Math.log10((rawRms[idx] + 1e-6) / (cleanRms[idx] + 1e-6)));
     }
 
-    // Gapless Mid-Play A/B Switching + Tap-to-Seek
     function stopBatchPlayback() {
       if (batchPlayheadAnimId) { cancelAnimationFrame(batchPlayheadAnimId); batchPlayheadAnimId = null; }
       if (batchSrcRaw) { try { batchSrcRaw.stop(); } catch (_) {} batchSrcRaw = null; }
@@ -3018,7 +3226,6 @@
     async function playOrSwitchBatch(channel, startOffsetSec = null) {
       if (!batchRawAudio || !batchCleanAudio) return;
 
-      // Seamless 15ms crossfade if already playing and not seeking
       if (batchPlayCtx && batchGainRaw && batchGainClean && startOffsetSec === null) {
         const now = batchPlayCtx.currentTime;
         batchGainRaw.gain.cancelScheduledValues(now);
@@ -3067,7 +3274,6 @@
 
       batchPlayDuration = rawBuf.duration;
       batchPlayOffsetSec = Math.min(offset, Math.max(0, batchPlayDuration - 0.05));
-      batchPlayStartCtxTime = batchPlayCtx.currentTime;
       activeBatchChannel = channel;
 
       batchPlayhead.style.display = 'block';
@@ -3101,8 +3307,7 @@
       batchPlayCleanBtn.disabled = true;
       batchDownloadBtn.disabled = true;
 
-      statusDot.className = 'status-dot loading';
-      engineStatus.textContent = 'Processing STFT...';
+      setEngineStatus('loading', 'Processing STFT...');
       batchStateTag.textContent = 'Enhancing';
       batchStateTag.className = 'chamber-state-tag';
       batchStageLabel.textContent = 'DeepFilterNet3 Worker Pass';
@@ -3163,16 +3368,14 @@
         batchProgressText.textContent = `${elapsedMs.toFixed(0)} ms`;
         batchStateTag.textContent = 'Isolated · Ready';
         batchStateTag.className = 'chamber-state-tag isolated';
-        statusDot.className = 'status-dot live';
-        engineStatus.textContent = 'Batch Ready';
+        setEngineStatus('live', 'Batch Ready');
 
         batchPlayRawBtn.disabled = false;
         batchPlayCleanBtn.disabled = false;
         batchDownloadBtn.disabled = false;
         addTrace(`Enhanced ${durSec.toFixed(1)}s clip in ${elapsedMs.toFixed(0)}ms (${rtFactor.toFixed(1)}× real-time).`, 'good');
       } catch (err) {
-        statusDot.className = 'status-dot';
-        engineStatus.textContent = 'Standby';
+        setEngineStatus('', 'Standby');
         batchStateTag.textContent = 'Error';
         batchProgressText.textContent = 'Failed';
         addTrace(`Batch error: ${err.message}`, 'warn');
@@ -3200,8 +3403,7 @@
       batchPlayCleanBtn.disabled = true;
       batchDownloadBtn.disabled = true;
 
-      statusDot.className = 'status-dot rec';
-      engineStatus.textContent = `Recording ${durationSec}s`;
+      setEngineStatus('rec', `Recording ${durationSec}s`);
       batchStateTag.textContent = `Recording ${durationSec}.0 s`;
       batchStateTag.className = 'chamber-state-tag recording';
       batchStageLabel.textContent = 'Capturing 48 kHz Mono Microphone';
@@ -3279,8 +3481,7 @@
         if (capStream) capStream.getTracks().forEach(t => t.stop());
         if (capCtx) { try { await capCtx.close(); } catch (_) {} }
         isBatchRecording = false;
-        statusDot.className = 'status-dot';
-        engineStatus.textContent = 'Standby';
+        setEngineStatus('', 'Standby');
         batchStateTag.textContent = `Ready · ${durationSec}.0 s`;
         batchStateTag.className = 'chamber-state-tag';
         batchRecBtn.disabled = false;
@@ -3318,7 +3519,7 @@
     }
 
     // =========================================================================
-    // 9. INTERACTIVE SPLIT CURTAIN DRAG & TAP-TO-SEEK (DESKTOP + MOBILE SAFE)
+    // 9. INTERACTIVE SPLIT CURTAIN DRAG & TAP-TO-SEEK
     // =========================================================================
     let isDraggingCurtain = false;
 
@@ -3363,7 +3564,6 @@
     splitViewLayer.addEventListener('click', handleSpectrogramSeek);
     stackedViewLayer.addEventListener('click', handleSpectrogramSeek);
 
-    // Drag & Drop Audio File onto Batch Chamber
     batchStageWrap.addEventListener('dragover', (e) => {
       e.preventDefault();
       batchStageWrap.classList.add('drag-over');
@@ -3440,7 +3640,7 @@
 
     blendSlider.addEventListener('input', (e) => {
       const pct = parseInt(e.target.value, 10);
-      blendValText.textContent = `${pct}% Wet · ${100 - pct}% Air`;
+      blendValText.textContent = `${pct}% Filter Strength`;
       if (workletNode) workletNode.port.postMessage({ type: 'SET_BLEND', blend: pct / 100 });
     });
 
@@ -3494,7 +3694,6 @@
       }
     });
 
-    // Window resize sync
     let resizeTimer = null;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
